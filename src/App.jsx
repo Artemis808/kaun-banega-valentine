@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 
 const questions = [
   {
@@ -16,7 +17,7 @@ const questions = [
   },
   {
     question:
-      "What was technically the first meal you made for me (with or without the help of others?)",
+      "What was technically the first meal you made for me?",
     options: [
       "You is a snacc",
       "Bheja fryyy",
@@ -28,15 +29,15 @@ const questions = [
   },
   {
     question:
-      "If not for your current job, in another universe, which job would you be perfect for?",
+      "If not for your current job, which job would you be perfect for?",
     options: [
-      "Fasshun model and trend setter",
+      "Fasshun model",
       "Interior designer",
-      "Personal chef (only for me😛)",
+      "Personal chef 😛",
       "Artist",
-      "Im a riderrr",
+      "Rider",
       "Dancer",
-      "All of the above and more!",
+      "All of the above!",
     ],
     correct: [6],
     image: "/kbv-images/3.jpg",
@@ -45,10 +46,10 @@ const questions = [
     question:
       "At what moment did I realize my life had quietly changed forever?",
     options: [
-      "Kantara Movie Day",
-      "11:11 — the past one and all to come",
-      "Cubbon park before SSB",
-      "The first of many 31/12’s",
+      "Kantara Day",
+      "All the 11:11s",
+      "Cubbon park",
+      "Our first 31/12",
     ],
     correct: [0, 1, 2, 3],
     image: "/kbv-images/4.jpg",
@@ -63,15 +64,14 @@ const questions = [
 ];
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
   const [started, setStarted] = useState(false);
   const [qIndex, setQIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [timer, setTimer] = useState(15);
   const [hearts, setHearts] = useState(0);
   const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
+  const [selected, setSelected] = useState(null);
 
-  // AUDIO
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
   const correctAudio = useRef(null);
@@ -79,7 +79,7 @@ export default function App() {
 
   const q = questions[qIndex];
 
-  // PRELOAD EVERYTHING
+  // PRELOAD
   useEffect(() => {
     questions.forEach((q) => {
       const img = new Image();
@@ -92,8 +92,6 @@ export default function App() {
     finaleAudio.current = new Audio("/music/finale.mp3");
 
     questionAudio.current.loop = true;
-
-    setTimeout(() => setLoading(false), 1200);
   }, []);
 
   // TIMER
@@ -117,26 +115,40 @@ export default function App() {
   }, [qIndex, started, revealed]);
 
   const startGame = () => {
-    openingAudio.current.play();
+    openingAudio.current.volume = 0.5;
     questionAudio.current.volume = 0.35;
+
+    openingAudio.current.play();
     questionAudio.current.play();
+
     setStarted(true);
   };
 
-  const selectAnswer = () => {
+  const selectAnswer = (i) => {
+    setSelected(i);
     correctAudio.current.play();
-    setRevealed(true);
 
-    const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
-    setHearts(percent);
+    setTimeout(() => {
+      setRevealed(true);
 
-    if (q.finale) {
-      questionAudio.current.pause();
-      finaleAudio.current.play();
-    }
+      const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
+      setHearts(percent);
+
+      if (q.finale) {
+        questionAudio.current.pause();
+        finaleAudio.current.play();
+
+        confetti({
+          particleCount: 220,
+          spread: 140,
+          origin: { y: 0.6 },
+        });
+      }
+    }, 900);
   };
 
   const next = () => {
+    setSelected(null);
     setRevealed(false);
     setQIndex((p) => p + 1);
     setRunaway({ x: 0, y: 0, scale: 1 });
@@ -150,31 +162,35 @@ export default function App() {
     });
   };
 
-  // LOADER
-  if (loading) {
-    return (
-      <div style={styles.loader}>
-        <img src="/kbv-logo.png" style={{ width: 170 }} />
-      </div>
-    );
-  }
-
-  // INTRO
+  // INTRO SCREEN
   if (!started) {
     return (
-      <div style={styles.center}>
-        <h2 style={{ color: "white", textAlign: "center" }}>
-          For the best experience, turn your sound on ❤️
-        </h2>
-        <button style={styles.startBtn} onClick={startGame}>
-          Tap To Begin
-        </button>
+      <div style={styles.loader}>
+        <motion.img
+          src="/kbv-logo.png"
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 1.2 }}
+          style={{ width: 200 }}
+        />
+
+        <motion.button
+          onClick={startGame}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          style={styles.beginBtn}
+        >
+          Enter The Experience ❤️
+        </motion.button>
       </div>
     );
   }
 
   return (
     <div style={styles.bg}>
+      {q.finale && !revealed && <div style={styles.spotlight} />}
+
       <div style={styles.heart}>
         ❤️ {hearts}% {hearts === 69 && "(nice)"}
       </div>
@@ -187,7 +203,7 @@ export default function App() {
             key={qIndex}
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.45 }}
             style={styles.card}
           >
@@ -210,8 +226,23 @@ export default function App() {
                 );
               }
 
+              const isCorrect = q.correct.includes(i);
+              const isSelected = selected === i;
+
               return (
-                <button key={i} style={styles.option} onClick={selectAnswer}>
+                <button
+                  key={i}
+                  onClick={() => selectAnswer(i)}
+                  style={{
+                    ...styles.option,
+                    ...(isSelected &&
+                      isCorrect && {
+                        background: "linear-gradient(45deg,#FFD700,#ffed8a)",
+                        boxShadow: "0 0 30px gold",
+                        transform: "scale(1.06)",
+                      }),
+                  }}
+                >
                   {opt}
                 </button>
               );
@@ -222,17 +253,16 @@ export default function App() {
             key="image"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
             style={styles.center}
           >
             <img src={q.image} style={styles.image} />
 
             {qIndex < questions.length - 1 ? (
-              <button style={styles.startBtn} onClick={next}>
+              <button style={styles.beginBtn} onClick={next}>
                 Continue ❤️
               </button>
             ) : (
-              <h1 style={{ color: "white" }}>🎉 Happy Valentine’s ❤️</h1>
+              <h1>🎉 You just made me the happiest person alive ❤️</h1>
             )}
           </motion.div>
         )}
@@ -246,18 +276,10 @@ const styles = {
     height: "100vh",
     background: "black",
     display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  center: {
-    minHeight: "100vh",
-    background: "black",
-    display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    gap: 24,
-    padding: 20,
+    gap: 40,
   },
   bg: {
     minHeight: "100vh",
@@ -265,6 +287,13 @@ const styles = {
       "radial-gradient(circle at center, #14003a, #060012 60%, black)",
     color: "white",
     padding: 20,
+  },
+  spotlight: {
+    position: "fixed",
+    inset: 0,
+    background:
+      "radial-gradient(circle at center, transparent 150px, rgba(0,0,0,0.94))",
+    pointerEvents: "none",
   },
   card: {
     maxWidth: 650,
@@ -281,7 +310,7 @@ const styles = {
     borderRadius: 12,
     border: "none",
     cursor: "pointer",
-    fontSize: 16,
+    transition: "0.25s",
   },
   no: {
     padding: 14,
@@ -291,27 +320,26 @@ const styles = {
     background: "#ff4d4d",
     cursor: "pointer",
   },
-  startBtn: {
-    padding: "14px 28px",
+  beginBtn: {
+    padding: "14px 30px",
     borderRadius: 14,
     border: "none",
     cursor: "pointer",
     fontSize: 16,
   },
+  center: {
+    minHeight: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 24,
+  },
   image: {
     maxWidth: "85vw",
     maxHeight: "65vh",
-    objectFit: "contain",
     borderRadius: 20,
   },
-  heart: {
-    position: "absolute",
-    right: 20,
-    top: 20,
-  },
-  timer: {
-    position: "absolute",
-    left: 20,
-    top: 20,
-  },
+  heart: { position: "absolute", right: 20, top: 20 },
+  timer: { position: "absolute", left: 20, top: 20 },
 };
