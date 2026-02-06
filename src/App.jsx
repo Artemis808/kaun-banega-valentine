@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const questions = [
@@ -71,17 +71,29 @@ export default function App() {
   const [hearts, setHearts] = useState(0);
   const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
 
+  // AUDIO
+  const openingAudio = useRef(null);
+  const questionAudio = useRef(null);
+  const correctAudio = useRef(null);
+  const finaleAudio = useRef(null);
+
   const q = questions[qIndex];
 
-  // PRELOAD
+  // PRELOAD EVERYTHING
   useEffect(() => {
-    const images = questions.map((q) => {
+    questions.forEach((q) => {
       const img = new Image();
       img.src = q.image;
-      return img;
     });
 
-    setTimeout(() => setLoading(false), 1500);
+    openingAudio.current = new Audio("/music/opening.mp3");
+    questionAudio.current = new Audio("/music/question.mp3");
+    correctAudio.current = new Audio("/music/correct.mp3");
+    finaleAudio.current = new Audio("/music/finale.mp3");
+
+    questionAudio.current.loop = true;
+
+    setTimeout(() => setLoading(false), 1200);
   }, []);
 
   // TIMER
@@ -104,11 +116,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, started, revealed]);
 
+  const startGame = () => {
+    openingAudio.current.play();
+    questionAudio.current.volume = 0.35;
+    questionAudio.current.play();
+    setStarted(true);
+  };
+
   const selectAnswer = () => {
+    correctAudio.current.play();
     setRevealed(true);
 
     const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
     setHearts(percent);
+
+    if (q.finale) {
+      questionAudio.current.pause();
+      finaleAudio.current.play();
+    }
   };
 
   const next = () => {
@@ -119,7 +144,7 @@ export default function App() {
 
   const moveNo = () => {
     setRunaway({
-      x: Math.random() * 200 - 100,
+      x: Math.random() * 250 - 125,
       y: Math.random() * 200 - 100,
       scale: runaway.scale * 0.8,
     });
@@ -129,12 +154,7 @@ export default function App() {
   if (loading) {
     return (
       <div style={styles.loader}>
-        <motion.img
-          src="/kbv-logo.png"
-          style={{ width: 140 }}
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
-        />
+        <img src="/kbv-logo.png" style={{ width: 170 }} />
       </div>
     );
   }
@@ -143,10 +163,10 @@ export default function App() {
   if (!started) {
     return (
       <div style={styles.center}>
-        <h2 style={{ color: "white" }}>
+        <h2 style={{ color: "white", textAlign: "center" }}>
           For the best experience, turn your sound on ❤️
         </h2>
-        <button style={styles.startBtn} onClick={() => setStarted(true)}>
+        <button style={styles.startBtn} onClick={startGame}>
           Tap To Begin
         </button>
       </div>
@@ -155,21 +175,20 @@ export default function App() {
 
   return (
     <div style={styles.bg}>
-      {/* Heart meter */}
       <div style={styles.heart}>
         ❤️ {hearts}% {hearts === 69 && "(nice)"}
       </div>
 
-      {/* Timer */}
       <div style={styles.timer}>⏳ {timer}</div>
 
       <AnimatePresence mode="wait">
         {!revealed ? (
           <motion.div
             key={qIndex}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.45 }}
             style={styles.card}
           >
             <h2>{q.question}</h2>
@@ -184,6 +203,7 @@ export default function App() {
                     style={styles.no}
                     animate={runaway}
                     onMouseEnter={moveNo}
+                    onClick={moveNo}
                   >
                     {opt}
                   </motion.button>
@@ -202,13 +222,14 @@ export default function App() {
             key="image"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
             style={styles.center}
           >
             <img src={q.image} style={styles.image} />
 
             {qIndex < questions.length - 1 ? (
               <button style={styles.startBtn} onClick={next}>
-                Next Question
+                Continue ❤️
               </button>
             ) : (
               <h1 style={{ color: "white" }}>🎉 Happy Valentine’s ❤️</h1>
@@ -229,13 +250,14 @@ const styles = {
     alignItems: "center",
   },
   center: {
-    height: "100vh",
+    minHeight: "100vh",
     background: "black",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    gap: 20,
+    gap: 24,
+    padding: 20,
   },
   bg: {
     minHeight: "100vh",
@@ -245,37 +267,41 @@ const styles = {
     padding: 20,
   },
   card: {
-    maxWidth: 600,
+    maxWidth: 650,
     margin: "auto",
-    background: "rgba(0,0,0,0.6)",
+    background: "rgba(0,0,0,0.65)",
     padding: 30,
     borderRadius: 20,
-    backdropFilter: "blur(12px)",
+    backdropFilter: "blur(14px)",
   },
   option: {
     width: "100%",
     padding: 14,
     marginTop: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     border: "none",
     cursor: "pointer",
+    fontSize: 16,
   },
   no: {
     padding: 14,
     marginTop: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     border: "none",
     background: "#ff4d4d",
     cursor: "pointer",
   },
   startBtn: {
-    padding: "12px 26px",
-    borderRadius: 12,
+    padding: "14px 28px",
+    borderRadius: 14,
     border: "none",
     cursor: "pointer",
+    fontSize: 16,
   },
   image: {
-    maxWidth: "80vw",
+    maxWidth: "85vw",
+    maxHeight: "65vh",
+    objectFit: "contain",
     borderRadius: 20,
   },
   heart: {
