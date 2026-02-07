@@ -60,9 +60,7 @@ export default function App() {
   const correctAudio = useRef(null);
   const finaleAudio = useRef(null);
 
-  const q = questions[qIndex];
-
-  // INITIALIZE AUDIO OBJECTS ONCE
+  // 1. Setup Audio Objects
   useEffect(() => {
     openingAudio.current = new Audio("/music/opening.mp3");
     questionAudio.current = new Audio("/music/question.mp3");
@@ -71,11 +69,13 @@ export default function App() {
 
     questionAudio.current.loop = true;
 
-    // PRELOAD IMAGES
+    // Preload images
     questions.forEach((q) => {
       const img = new Image();
       img.src = q.image;
     });
+
+    return () => stopAllAudio();
   }, []);
 
   const stopAllAudio = () => {
@@ -83,67 +83,34 @@ export default function App() {
       if (ref.current) {
         ref.current.pause();
         ref.current.currentTime = 0;
+        ref.current.onended = null; // Clear listeners
       }
     });
   };
 
-  // LOVE METER SMOOTH COUNT
-  useEffect(() => {
-    if (displayHearts === hearts) return;
-    const interval = setInterval(() => {
-      setDisplayHearts((prev) => {
-        if (prev >= hearts) {
-          clearInterval(interval);
-          return hearts;
-        }
-        return prev + 1;
-      });
-    }, 18);
-    return () => clearInterval(interval);
-  }, [hearts]);
-
-  // TIMER LOGIC
-  useEffect(() => {
-    if (!started || revealed) return;
-    setTimer(15);
-    const interval = setInterval(() => {
-      setTimer((t) => {
-        if (t <= 1) {
-          clearInterval(interval);
-          setRevealed(true);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [qIndex, started, revealed]);
-
-  // STEP 1: CLICK HEART (Unlocks Audio Context)
+  // 2. The Heart Click (Phase 1) - Starts Opening Music
   const handleInteraction = () => {
+    stopAllAudio();
     setInteracted(true);
-    // Silent play to prime the browser
-    openingAudio.current.play().then(() => {
-      openingAudio.current.pause();
-      openingAudio.current.currentTime = 0;
-    }).catch(() => {});
-  };
-
-  // STEP 2: START EXPERIENCE (Opening Song -> Question Song)
-  const startGame = () => {
-    stopAllAudio(); // Ensure clean slate
-    setStarted(true);
-
+    
     openingAudio.current.volume = 0.7;
-    openingAudio.current.play();
+    openingAudio.current.play().catch(err => console.log("Playback failed", err));
 
-    // The key fix: Wait for opening audio to FINISH before starting question audio
+    // Queue up the question music for when opening ends
     openingAudio.current.onended = () => {
-      questionAudio.current.volume = 0.4;
-      questionAudio.current.play();
+      if (!finaleAudio.current.playing) { // Only if we aren't at the end already
+        questionAudio.current.volume = 0.35;
+        questionAudio.current.play();
+      }
     };
   };
 
+  // 3. Start Button (Phase 2) - Just moves to Quiz
+  const startGame = () => {
+    setStarted(true);
+  };
+
+  // 4. Handle Answers
   const selectAnswer = (i) => {
     setSelected(i);
     correctAudio.current.currentTime = 0;
@@ -156,19 +123,48 @@ export default function App() {
 
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.2 } });
 
-      if (q.finale) {
+      if (questions[qIndex].finale) {
+        // Transition to Finale Music
+        openingAudio.current.pause();
         questionAudio.current.pause();
         finaleAudio.current.currentTime = 0;
+        finaleAudio.current.volume = 0.7;
         finaleAudio.current.play();
         confetti({ particleCount: 220, spread: 140, origin: { y: 0.6 } });
       }
     }, 900);
   };
 
+  // Logic for Love Meter Counting
+  useEffect(() => {
+    if (displayHearts === hearts) return;
+    const interval = setInterval(() => {
+      setDisplayHearts(p => (p < hearts ? p + 1 : hearts));
+    }, 18);
+    return () => clearInterval(interval);
+  }, [hearts]);
+
+  // Logic for Timer
+  useEffect(() => {
+    if (!started || revealed) return;
+    setTimer(15);
+    const interval = setInterval(() => {
+      setTimer(t => {
+        if (t <= 1) {
+          clearInterval(interval);
+          setRevealed(true);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qIndex, started, revealed]);
+
   const next = () => {
     setSelected(null);
     setRevealed(false);
-    setQIndex((p) => p + 1);
+    setQIndex(p => p + 1);
     setRunaway({ x: 0, y: 0, scale: 1 });
   };
 
@@ -185,12 +181,13 @@ export default function App() {
 
   const moveNo = () => {
     setRunaway({
-      x: Math.random() * 250 - 125,
-      y: Math.random() * 200 - 100,
-      scale: runaway.scale * 0.8,
+      x: Math.random() * 200 - 100,
+      y: Math.random() * 160 - 80,
+      scale: runaway.scale * 0.85
     });
   };
 
+  // VIEW 1: THE HEART (AUDIO STARTS HERE)
   if (!interacted) {
     return (
       <div style={styles.loader}>
@@ -198,46 +195,56 @@ export default function App() {
           animate={{ scale: [1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 1.5 }}
           onClick={handleInteraction}
-          style={{ cursor: "pointer", fontSize: 80 }}
+          style={{ cursor: "pointer", fontSize: 100 }}
         >
           ❤️
         </motion.div>
-        <p style={{ color: "white", opacity: 0.6 }}>Tap to begin</p>
+        <p style={{ color: "white", opacity: 0.8, fontSize: 18, fontWeight: "bold" }}>Tap the heart to start</p>
       </div>
     );
   }
 
+  // VIEW 2: LOGO REVEAL (MUSIC IS ALREADY PLAYING)
   if (!started) {
     return (
       <div style={styles.loader}>
         <motion.img
           src="/kbv-logo.png"
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.7, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.8 }}
           style={{ width: 180 }}
         />
-        <motion.button onClick={startGame} style={styles.beginBtn}>
+        <motion.button 
+          onClick={startGame} 
+          style={styles.beginBtn}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
           Enter The Experience ❤️
         </motion.button>
       </div>
     );
   }
 
+  // VIEW 3: THE QUIZ
   return (
     <div style={styles.bg}>
-      {q.finale && !revealed && <div style={styles.spotlight} />}
+      {questions[qIndex].finale && !revealed && <div style={styles.spotlight} />}
       
-      <motion.div style={styles.heart} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity }}>
-        ❤️ {displayHearts}% {displayHearts === 69 && "(nice)"}
-      </motion.div>
-      <div style={styles.timer}>⏳ {timer}</div>
+      <div style={styles.topBar}>
+        <div style={styles.timer}>⏳ {timer}</div>
+        <motion.div style={styles.heartMeter} animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity }}>
+          ❤️ {displayHearts}% {displayHearts === 69 && "(nice)"}
+        </motion.div>
+      </div>
 
       <AnimatePresence mode="wait">
         {!revealed ? (
           <motion.div key={qIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
-            <h2 style={styles.questionText}>{q.question}</h2>
-            {q.options.map((opt, i) => {
-              if (q.finale && i === 3) {
+            <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
+            {questions[qIndex].options.map((opt, i) => {
+              if (questions[qIndex].finale && i === 3) {
                 return (
                   <motion.button key={i} style={styles.no} animate={runaway} onMouseEnter={moveNo} onClick={moveNo}>
                     {opt}
@@ -245,7 +252,11 @@ export default function App() {
                 );
               }
               return (
-                <button key={i} onClick={() => selectAnswer(i)} style={{...styles.option, ...(selected === i && q.correct.includes(i) && styles.correctSelected)}}>
+                <button 
+                  key={i} 
+                  onClick={() => selectAnswer(i)} 
+                  style={{...styles.option, ...(selected === i && questions[qIndex].correct.includes(i) && styles.correctSelected)}}
+                >
                   {opt}
                 </button>
               );
@@ -253,7 +264,7 @@ export default function App() {
           </motion.div>
         ) : (
           <motion.div key="image" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={styles.center}>
-            <img src={q.image} style={styles.image} alt="Memory" />
+            <img src={questions[qIndex].image} style={styles.image} alt="Memory" />
             {qIndex < questions.length - 1 ? (
               <button style={styles.beginBtn} onClick={next}>Continue ❤️</button>
             ) : (
@@ -271,18 +282,19 @@ export default function App() {
 
 const styles = {
   loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 30 },
-  bg: { minHeight: "100vh", background: "radial-gradient(circle at center, #14003a, #060012 60%, black)", color: "white", padding: "80px 20px 20px" },
-  spotlight: { position: "fixed", inset: 0, background: "radial-gradient(circle at center, transparent 150px, rgba(0,0,0,0.94))", pointerEvents: "none" },
-  card: { maxWidth: 500, margin: "auto", background: "rgba(0,0,0,0.75)", padding: 25, borderRadius: 20 },
-  questionText: { fontSize: "1.2rem", marginBottom: 20 },
-  option: { width: "100%", padding: 14, marginTop: 12, borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.1)", color: "white" },
-  correctSelected: { background: "linear-gradient(45deg,#FFD700,#fff0a8)", color: "black", fontWeight: "bold", boxShadow: "0 0 20px gold" },
+  bg: { minHeight: "100vh", background: "radial-gradient(circle at center, #14003a, #060012 60%, black)", color: "white", padding: "100px 20px 40px" },
+  topBar: { position: "absolute", top: 30, left: 20, right: 20, display: "flex", justifyContent: "space-between", alignItems: "center" },
+  heartMeter: { fontSize: "1.2rem", fontWeight: "bold" },
+  timer: { fontSize: "1.2rem", fontWeight: "bold" },
+  spotlight: { position: "fixed", inset: 0, background: "radial-gradient(circle at center, transparent 150px, rgba(0,0,0,0.96))", pointerEvents: "none", zIndex: 5 },
+  card: { maxWidth: 500, margin: "auto", background: "rgba(255,255,255,0.05)", backdropFilter: "blur(10px)", padding: 25, borderRadius: 24, border: "1px solid rgba(255,255,255,0.1)", position: "relative", zIndex: 10 },
+  questionText: { fontSize: "1.3rem", marginBottom: 25, lineHeight: 1.4, textAlign: "center" },
+  option: { width: "100%", padding: 16, marginTop: 12, borderRadius: 15, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "1rem", transition: "0.2s" },
+  correctSelected: { background: "linear-gradient(45deg,#FFD700,#fff0a8)", color: "black", fontWeight: "bold", boxShadow: "0 0 25px gold" },
   no: { padding: 14, marginTop: 12, borderRadius: 12, border: "none", background: "#ff4d4d", color: "white", cursor: "pointer" },
-  beginBtn: { padding: "14px 30px", borderRadius: 50, border: "none", cursor: "pointer", background: "white", color: "black", fontWeight: "bold" },
+  beginBtn: { padding: "16px 35px", borderRadius: 50, border: "none", cursor: "pointer", background: "white", color: "black", fontWeight: "bold", fontSize: "1.1rem" },
   center: { display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" },
-  image: { maxWidth: "85vw", maxHeight: "50vh", borderRadius: 15, boxShadow: "0 10px 30px rgba(0,0,0,0.5)" },
-  finalWrapper: { display: "flex", flexDirection: "column", alignItems: "center", gap: 25 },
-  finalText: { fontSize: "clamp(22px, 5vw, 36px)", textAlign: "center", lineHeight: 1.3, background: "linear-gradient(45deg,#FFD700,#fff0a8)", WebkitBackgroundClip: "text", color: "transparent", fontWeight: "800" },
-  heart: { position: "absolute", right: 20, top: 20, fontSize: "1.1rem", fontWeight: "700" },
-  timer: { position: "absolute", left: 20, top: 20, fontSize: "1.1rem", fontWeight: "700" },
+  image: { maxWidth: "88vw", maxHeight: "45vh", borderRadius: 20, boxShadow: "0 15px 40px rgba(0,0,0,0.6)", objectFit: "cover" },
+  finalText: { fontSize: "clamp(22px, 5.5vw, 32px)", textAlign: "center", lineHeight: 1.2, background: "linear-gradient(45deg,#FFD700,#fff0a8)", WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", filter: "drop-shadow(0 2px 10px rgba(255,215,0,0.3))" },
+  finalWrapper: { display: "flex", flexDirection: "column", alignItems: "center", gap: 30 },
 };
