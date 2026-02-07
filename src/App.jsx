@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 
+// --- CONTENT ---
 const questions = [
   {
     question: "What is Sarangae and why is stuck in my mind from my first impression of you?",
@@ -44,12 +45,27 @@ const questions = [
   },
 ];
 
+// --- UTILS ---
+const fadeOut = (audioRef, onComplete) => {
+  if (!audioRef.current) return;
+  const fadeAudio = setInterval(() => {
+    if (audioRef.current.volume > 0.05) {
+      audioRef.current.volume -= 0.05;
+    } else {
+      clearInterval(fadeAudio);
+      audioRef.current.pause();
+      audioRef.current.volume = 1; 
+      if (onComplete) onComplete();
+    }
+  }, 50); 
+};
+
 export default function App() {
-  // STAGES: "lock" -> "intro" -> "quiz" -> "finale"
-  const [stage, setStage] = useState("lock"); 
-  const [showStartBtn, setShowStartBtn] = useState(false); // Delays the button
+  const [stage, setStage] = useState("loading"); 
+  const [isAudioReady, setIsAudioReady] = useState(false);
+  const [showStartBtn, setShowStartBtn] = useState(false);
   
-  // QUIZ STATE
+  // Game State
   const [qIndex, setQIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [timer, setTimer] = useState(15);
@@ -58,74 +74,91 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
 
-  // AUDIO REFS
+  // Audio Refs
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
   const correctAudio = useRef(null);
   const finaleAudio = useRef(null);
+  
+  // NEW: Audio Haptic Ref
+  const popAudio = useRef(null); 
 
+  // --- INITIAL SETUP ---
   useEffect(() => {
     openingAudio.current = new Audio("/music/opening.mp3");
     questionAudio.current = new Audio("/music/question.mp3");
     correctAudio.current = new Audio("/music/correct.mp3");
     finaleAudio.current = new Audio("/music/finale.mp3");
-
-    questionAudio.current.loop = true; // Loop the thinking music
     
-    // Preload Images
+    // NEW: "Pop" sound for haptic feel
+    // You'll need a short 'pop.mp3' in your public/music folder
+    popAudio.current = new Audio("/music/pop.mp3"); 
+
+    questionAudio.current.loop = true;
+
+    openingAudio.current.addEventListener("canplaythrough", () => {
+      setIsAudioReady(true);
+      setStage("lock");
+    });
+    
+    setTimeout(() => {
+      setIsAudioReady(true);
+      setStage("lock");
+    }, 3000);
+
     questions.forEach((q) => {
       const img = new Image();
       img.src = q.image;
     });
 
-    return () => stopAllAudio();
+    return () => {
+      [openingAudio, questionAudio, correctAudio, finaleAudio].forEach(ref => ref.current?.pause());
+    };
   }, []);
 
-  const stopAllAudio = () => {
-    [openingAudio, questionAudio, correctAudio, finaleAudio].forEach((ref) => {
-      if (ref.current) {
-        ref.current.pause();
-        ref.current.currentTime = 0;
-      }
-    });
+  // --- ACTIONS ---
+
+  // Custom Haptic Function
+  const triggerHaptic = () => {
+    // 1. Try native vibration (Android)
+    if (navigator.vibrate) {
+        navigator.vibrate(15); // Very short, sharp tick
+    }
+    
+    // 2. Play silent "pop" for iOS (Audio Haptic)
+    if (popAudio.current) {
+        popAudio.current.volume = 0.5; // Not too loud, just felt
+        popAudio.current.currentTime = 0;
+        popAudio.current.play().catch(() => {});
+    }
   };
 
-  // 1. UNLOCK AUDIO (User Clicks Heart)
   const handleUnlock = () => {
+    triggerHaptic(); // Feedback on first tap
     setStage("intro");
     
-    // Play Opening Music Immediately
     if (openingAudio.current) {
       openingAudio.current.volume = 0.7;
-      openingAudio.current.play().catch((e) => console.log("Audio Error:", e));
+      openingAudio.current.play().catch(e => console.error(e));
     }
 
-    // Wait 4 seconds before even showing the "Enter Experience" button
-    // This forces the user to listen to the intro song for a bit.
-    setTimeout(() => {
-      setShowStartBtn(true);
-    }, 4000); 
+    setTimeout(() => setShowStartBtn(true), 4000);
   };
 
-  // 2. START QUIZ (User Clicks Button)
   const startQuiz = () => {
-    // FADE OUT OPENING? Or just stop it. Let's stop it for safety.
-    if (openingAudio.current) {
-      openingAudio.current.pause(); 
-    }
-
-    // Start Question Music
-    if (questionAudio.current) {
-      questionAudio.current.volume = 0.4;
+    triggerHaptic();
+    fadeOut(openingAudio, () => {
       questionAudio.current.currentTime = 0;
+      questionAudio.current.volume = 0.4;
       questionAudio.current.play();
-    }
-
+    });
     setStage("quiz");
   };
 
   const selectAnswer = (i) => {
+    triggerHaptic(); // Tactile feel on answer selection
     setSelected(i);
+    
     correctAudio.current.currentTime = 0;
     correctAudio.current.play();
 
@@ -133,29 +166,31 @@ export default function App() {
       setRevealed(true);
       const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
       setHearts(percent);
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.2 } });
+      
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.3 } });
 
       if (questions[qIndex].finale) {
-        // Stop Loop, Play Finale
         questionAudio.current.pause();
         finaleAudio.current.currentTime = 0;
-        finaleAudio.current.volume = 0.8;
+        finaleAudio.current.volume = 1;
         finaleAudio.current.play();
-        confetti({ particleCount: 220, spread: 140, origin: { y: 0.6 } });
+        confetti({ particleCount: 200, spread: 160, origin: { y: 0.6 } });
       }
-    }, 900);
+    }, 800);
   };
 
   const nextQuestion = () => {
+    triggerHaptic();
     setSelected(null);
     setRevealed(false);
-    setQIndex((prev) => prev + 1);
+    setQIndex(prev => prev + 1);
     setRunaway({ x: 0, y: 0, scale: 1 });
   };
 
   const restartGame = () => {
-    stopAllAudio();
-    setStage("lock"); // Go back to very start
+    triggerHaptic();
+    fadeOut(finaleAudio);
+    setStage("lock");
     setShowStartBtn(false);
     setQIndex(0);
     setHearts(0);
@@ -164,21 +199,20 @@ export default function App() {
     setRevealed(false);
   };
 
-  // Love Meter Logic
+  // --- TIMERS ---
   useEffect(() => {
     if (displayHearts === hearts) return;
     const interval = setInterval(() => {
-      setDisplayHearts((p) => (p < hearts ? p + 1 : hearts));
+      setDisplayHearts(p => (p < hearts ? p + 1 : hearts));
     }, 20);
     return () => clearInterval(interval);
   }, [hearts]);
 
-  // Timer Logic
   useEffect(() => {
     if (stage !== "quiz" || revealed) return;
     setTimer(15);
     const interval = setInterval(() => {
-      setTimer((t) => {
+      setTimer(t => {
         if (t <= 1) {
           clearInterval(interval);
           setRevealed(true);
@@ -190,9 +224,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, stage, revealed]);
 
-  // --- RENDER STAGES ---
+  // --- RENDER ---
+  
+  if (stage === "loading") {
+    return <div style={styles.loader}><div style={styles.spinner}>❤️</div></div>;
+  }
 
-  // STAGE 1: LOCK SCREEN (Silent)
   if (stage === "lock") {
     return (
       <div style={styles.loader}>
@@ -200,16 +237,16 @@ export default function App() {
           animate={{ scale: [1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 1.5 }}
           onClick={handleUnlock}
-          style={{ cursor: "pointer", fontSize: 100 }}
+          style={{ cursor: "pointer", fontSize: 90 }}
+          whileTap={{ scale: 0.8 }}
         >
           ❤️
         </motion.div>
-        <p style={{ color: "white", opacity: 0.7, fontSize: 16 }}>Tap to unlock sound</p>
+        <p style={{ ...styles.text, marginTop: 20 }}>Tap heart to unlock</p>
       </div>
     );
   }
 
-  // STAGE 2: CINEMATIC INTRO (Opening Music Playing)
   if (stage === "intro") {
     return (
       <div style={styles.loader}>
@@ -218,112 +255,108 @@ export default function App() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.5 }}
-          style={{ width: 200 }}
+          style={{ width: "60%", maxWidth: 200 }}
         />
         
-        {/* Helper Text while waiting */}
-        {!showStartBtn && (
-            <motion.p 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 0.6 }} 
-                transition={{ delay: 1 }}
-                style={{ color: "white", marginTop: 20 }}
+        <div style={{ height: 60, marginTop: 30 }}>
+            {showStartBtn ? (
+            <motion.button
+                onClick={startQuiz}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={styles.btn}
+                whileTap={{ scale: 0.95 }}
             >
-                Loading memories...
-            </motion.p>
-        )}
-
-        {/* Button only appears after 4 seconds */}
-        {showStartBtn && (
-          <motion.button
-            onClick={startQuiz}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={styles.beginBtn}
-            whileHover={{ scale: 1.05 }}
-          >
-            Let's Begin ❤️
-          </motion.button>
-        )}
+                Start The Journey ❤️
+            </motion.button>
+            ) : (
+             <motion.p initial={{opacity:0}} animate={{opacity:0.7}} style={styles.text}>Loading memories...</motion.p>
+            )}
+        </div>
       </div>
     );
   }
 
-  // STAGE 3: QUIZ (Question Music Playing)
+  // QUIZ & FINALE
   return (
     <div style={styles.bg}>
-      {questions[qIndex].finale && !revealed && <div style={styles.spotlight} />}
-      
-      <div style={styles.topBar}>
-        <div style={styles.timer}>⏳ {timer}</div>
-        <motion.div style={styles.heartMeter}>
-          ❤️ {displayHearts}% {displayHearts === 69 && "(nice)"}
-        </motion.div>
+      <div style={styles.statusBar}>
+        <div style={styles.statusItem}>⏳ {timer}s</div>
+        <div style={styles.statusItem}>❤️ {displayHearts}%</div>
       </div>
 
       <AnimatePresence mode="wait">
         {!revealed ? (
           <motion.div
-            key={qIndex}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            key={`q-${qIndex}`}
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
             style={styles.card}
           >
-            <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
-            {questions[qIndex].options.map((opt, i) => {
-              // Runaway Button Logic
-              if (questions[qIndex].finale && i === 3) {
+            <h2 style={styles.question}>{questions[qIndex].question}</h2>
+            
+            <div style={styles.optionsGrid}>
+                {questions[qIndex].options.map((opt, i) => {
+                if (questions[qIndex].finale && i === 3) {
+                    return (
+                    <motion.button
+                        key={i}
+                        style={{...styles.option, background: "#ff4d4d", border: "none"}}
+                        animate={runaway}
+                        onMouseEnter={() => setRunaway({
+                            x: Math.random() * 100 - 50, 
+                            y: Math.random() * 100 - 50,
+                            scale: 0.9
+                        })}
+                        onTouchStart={() => setRunaway({
+                            x: Math.random() * 100 - 50, 
+                            y: Math.random() * 100 - 50,
+                            scale: 0.9
+                        })}
+                    >
+                        {opt}
+                    </motion.button>
+                    );
+                }
                 return (
-                  <motion.button
+                    <motion.button
                     key={i}
-                    style={styles.no}
-                    animate={runaway}
-                    onMouseEnter={() => setRunaway({
-                      x: Math.random() * 200 - 100,
-                      y: Math.random() * 150 - 75,
-                      scale: 0.9 
-                    })}
-                  >
+                    onClick={() => selectAnswer(i)}
+                    style={{
+                        ...styles.option,
+                        ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    >
                     {opt}
-                  </motion.button>
+                    </motion.button>
                 );
-              }
-              // Normal Buttons
-              return (
-                <button
-                  key={i}
-                  onClick={() => selectAnswer(i)}
-                  style={{
-                    ...styles.option,
-                    ...(selected === i && questions[qIndex].correct.includes(i) && styles.correctSelected),
-                  }}
-                >
-                  {opt}
-                </button>
-              );
-            })}
+                })}
+            </div>
           </motion.div>
         ) : (
           <motion.div
-            key="image"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            key={`img-${qIndex}`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             style={styles.center}
           >
-            <img src={questions[qIndex].image} style={styles.image} alt="Memory" />
-            
+            <div style={styles.imageFrame}>
+                <img src={questions[qIndex].image} style={styles.image} alt="Memory" />
+            </div>
+
             {qIndex < questions.length - 1 ? (
-              <button style={styles.beginBtn} onClick={nextQuestion}>
-                Continue ❤️
+              <button style={styles.btn} onClick={nextQuestion}>
+                Next ❤️
               </button>
             ) : (
-              <div style={styles.finalWrapper}>
+              <div style={{textAlign: "center", display: "flex", flexDirection: "column", gap: 20}}>
                 <h1 style={styles.finalText}>
-                  ❤️ Happy Valentine’s Day <br /> To My Forever Valentine ❤️
+                  Happy Valentine’s Day <br /> My Forever Valentine
                 </h1>
-                <button style={styles.beginBtn} onClick={restartGame}>
-                  Back to Start ❤️
+                <button style={styles.btn} onClick={restartGame}>
+                  Play Again ❤️
                 </button>
               </div>
             )}
@@ -334,124 +367,142 @@ export default function App() {
   );
 }
 
-// --- STYLES ---
+// --- STYLES (Unchanged from previous best version) ---
 const styles = {
   loader: {
     height: "100vh",
-    background: "black",
+    background: "#000",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    gap: 30,
+    color: "#fff",
+  },
+  spinner: {
+    fontSize: 40,
+    animation: "spin 1s linear infinite",
   },
   bg: {
     minHeight: "100vh",
-    background: "radial-gradient(circle at center, #14003a, #060012 60%, black)",
+    width: "100%",
+    background: "radial-gradient(circle at top center, #2e004f, #000 90%)",
     color: "white",
-    padding: "100px 20px 40px",
+    padding: "80px 16px 40px",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    overflowX: "hidden", 
   },
-  topBar: {
-    position: "absolute",
-    top: 30,
-    left: 20,
-    right: 20,
+  statusBar: {
+    position: "fixed",
+    top: 10,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "90%",
+    maxWidth: 400,
+    height: 50,
+    background: "rgba(255,255,255,0.1)",
+    backdropFilter: "blur(10px)",
+    borderRadius: 30,
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    zIndex: 10,
+    padding: "0 20px",
+    zIndex: 100,
+    border: "1px solid rgba(255,255,255,0.1)",
+    boxSizing: "border-box",
   },
-  heartMeter: { fontSize: "1.2rem", fontWeight: "bold" },
-  timer: { fontSize: "1.2rem", fontWeight: "bold" },
-  spotlight: {
-    position: "fixed",
-    inset: 0,
-    background: "radial-gradient(circle at center, transparent 150px, rgba(0,0,0,0.95))",
-    pointerEvents: "none",
-    zIndex: 5,
+  statusItem: {
+    fontWeight: "bold",
+    fontSize: 16,
+    textShadow: "0 2px 4px rgba(0,0,0,0.5)",
   },
   card: {
-    maxWidth: 500,
-    margin: "auto",
-    background: "rgba(255,255,255,0.05)",
-    backdropFilter: "blur(10px)",
-    padding: 25,
+    width: "100%",
+    maxWidth: 450,
+    background: "rgba(20,20,20,0.8)",
+    padding: 24,
     borderRadius: 24,
-    border: "1px solid rgba(255,255,255,0.1)",
-    position: "relative",
-    zIndex: 10,
+    border: "1px solid rgba(255,255,255,0.08)",
+    backdropFilter: "blur(12px)",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
   },
-  questionText: {
-    fontSize: "1.3rem",
-    marginBottom: 25,
+  question: {
+    fontSize: "clamp(1.1rem, 5vw, 1.4rem)",
+    marginBottom: 24,
     lineHeight: 1.4,
+    fontWeight: 600,
     textAlign: "center",
   },
+  optionsGrid: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
   option: {
-    width: "100%",
-    padding: 16,
-    marginTop: 12,
-    borderRadius: 15,
-    border: "none",
-    cursor: "pointer",
-    background: "rgba(255,255,255,0.1)",
+    padding: "16px",
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.05)",
     color: "white",
     fontSize: "1rem",
-    transition: "0.2s",
+    fontWeight: 500,
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "background 0.2s",
+    touchAction: "manipulation", 
   },
-  correctSelected: {
-    background: "linear-gradient(45deg,#FFD700,#fff0a8)",
+  correct: {
+    background: "linear-gradient(90deg, #FFD700, #FFA500)",
     color: "black",
     fontWeight: "bold",
-    boxShadow: "0 0 25px gold",
-  },
-  no: {
-    padding: 14,
-    marginTop: 12,
-    borderRadius: 12,
     border: "none",
-    background: "#ff4d4d",
-    color: "white",
-    cursor: "pointer",
+    boxShadow: "0 0 15px rgba(255, 215, 0, 0.4)",
   },
-  beginBtn: {
-    padding: "16px 35px",
+  btn: {
+    padding: "16px 40px",
     borderRadius: 50,
     border: "none",
-    cursor: "pointer",
     background: "white",
     color: "black",
     fontWeight: "bold",
-    fontSize: "1.1rem",
+    fontSize: 18,
+    cursor: "pointer",
+    boxShadow: "0 4px 15px rgba(255,255,255,0.2)",
+    touchAction: "manipulation",
   },
   center: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 20,
-    textAlign: "center",
+    justifyContent: "center",
+    width: "100%",
+  },
+  imageFrame: {
+    padding: 10,
+    background: "rgba(255,255,255,0.1)",
+    borderRadius: 24,
+    marginBottom: 25,
   },
   image: {
-    maxWidth: "88vw",
-    maxHeight: "45vh",
-    borderRadius: 20,
-    boxShadow: "0 15px 40px rgba(0,0,0,0.6)",
+    display: "block",
+    maxWidth: "100%",
+    maxHeight: "50vh",
+    borderRadius: 16,
     objectFit: "cover",
   },
-  finalWrapper: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 30,
+  text: {
+    color: "#aaa",
+    fontSize: 14,
   },
   finalText: {
-    fontSize: "clamp(22px, 5.5vw, 32px)",
-    textAlign: "center",
-    lineHeight: 1.2,
-    background: "linear-gradient(45deg,#FFD700,#fff0a8)",
+    fontSize: "clamp(2rem, 8vw, 3rem)",
+    background: "linear-gradient(to right, #FFD700, #FDB931)",
     WebkitBackgroundClip: "text",
     color: "transparent",
-    fontWeight: "900",
-    padding: "0 10px",
+    fontWeight: 800,
+    lineHeight: 1.1,
+    textAlign: "center",
   },
 };
