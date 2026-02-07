@@ -91,12 +91,12 @@ export default function App() {
     }
   };
   const moveNoButton = () => {
-    const randomX = (Math.random() - 0.5) * 200;
-    const randomY = (Math.random() - 0.5) * 200;
+    const randomX = (Math.random() - 0.5) * 320;
+    const randomY = (Math.random() - 0.5) * 320;
     setNoButtonPos(prev => ({ 
       x: randomX, 
       y: randomY,
-      scale: Math.max(0.3, (prev.scale || 1) - 0.15) // Shrink progressively but not below 0.3
+      scale: Math.max(0.3, (prev.scale || 1) - 0.15)
     }));
   };
   const handleUnlock = () => {
@@ -188,44 +188,61 @@ export default function App() {
         {!revealed ? (
           <motion.div key={`q-${qIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
             <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
-            {questions[qIndex].options.map((opt, i) => (
-              <motion.button
-                key={i}
-                variants={glowVariants}
-                whileHover="hover"
-                whileTap="tap"
-                onClick={() => {
-                  if (questions[qIndex].finale && i === 3) {
-                    moveNoButton();
-                  } else {
-                    selectAnswer(i);
-                  }
-                }}
-                onMouseEnter={() => {
-                  if (questions[qIndex].finale && i === 3) moveNoButton();
-                }}
-                onTouchStart={(e) => {
-                  if (questions[qIndex].finale && i === 3) {
-                    e.preventDefault();
-                    moveNoButton();
-                  }
-                }}
-                style={{
-                    ...styles.option,
-                    ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {}),
-                    ...(questions[qIndex].finale && i === 3 ? {
-                      position: 'relative',
-                      transform: `translate(${noButtonPos.x}px, ${noButtonPos.y}px) scale(${noButtonPos.scale})`,
-                      transition: 'transform 0.3s ease',
+            {questions[qIndex].options.map((opt, i) => {
+              if (questions[qIndex].finale && i === 3) {
+                return (
+                  <motion.button
+                    key={i}
+                    animate={{
+                      x: noButtonPos.x,
+                      y: noButtonPos.y,
+                      scale: noButtonPos.scale
+                    }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 18
+                    }}
+                    variants={glowVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      moveNoButton();
+                    }}
+                    onMouseEnter={moveNoButton}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      moveNoButton();
+                    }}
+                    style={{
+                      ...styles.option,
                       background: 'rgba(255, 0, 0, 0.2)',
                       border: '1px solid rgba(255, 0, 0, 0.4)',
-                      color: '#ff6b6b'
-                    } : {})
-                }}
-              >
-                {opt}
-              </motion.button>
-            ))}
+                      color: '#ff6b6b',
+                      position: 'relative'
+                    }}
+                  >
+                    {opt}
+                  </motion.button>
+                );
+              }
+              return (
+                <motion.button
+                  key={i}
+                  variants={glowVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                  onClick={() => selectAnswer(i)}
+                  style={{
+                      ...styles.option,
+                      ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})
+                  }}
+                >
+                  {opt}
+                </motion.button>
+              );
+            })}
           </motion.div>
         ) : (
           <motion.div key={`img-${qIndex}`} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
@@ -247,71 +264,3 @@ export default function App() {
     </div>
   );
 }
-const styles = {
-  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20 },
-  subText: { color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' },
-  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1a0033, #000 90%)", color: "white", padding: "80px 15px 30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden" },
-  
-  statusBar: { 
-    position: "fixed", top: 15, width: "85%", maxWidth: 350, 
-    background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", 
-    borderRadius: 40, padding: "8px 20px", display: "flex", 
-    justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.1)", zIndex: 100 
-  },
-  statusItem: { fontWeight: "bold", fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 },
-  niceText: { fontSize: '0.7rem', color: '#FFD700', marginLeft: 2 },
-  card: { width: "100%", maxWidth: 420, background: "rgba(255,255,255,0.04)", borderRadius: 30, padding: 25, border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)" },
-  questionText: { fontSize: "1.2rem", textAlign: "center", marginBottom: 20, lineHeight: 1.4, fontWeight: "500" },
-  
-  option: { 
-    width: "100%", padding: "16px", marginTop: 10, borderRadius: 18, 
-    border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", 
-    color: "white", cursor: "pointer", textAlign: "left", fontSize: "0.95rem",
-    transition: "all 0.2s ease" 
-  },
-  correct: { background: "linear-gradient(90deg, #FFD700, #FFA500)", color: "black", fontWeight: "bold", border: "none" },
-  
-  btn: { 
-    padding: "15px 45px", borderRadius: 50, border: "none", background: "white", 
-    color: "black", fontWeight: "bold", fontSize: 16, cursor: "pointer", 
-    marginTop: 15, boxShadow: "0 8px 20px rgba(0,0,0,0.4)" 
-  },
-  imageContainer: { 
-    display: "flex", 
-    flexDirection: "column", 
-    alignItems: "center", 
-    width: "100%", 
-    maxWidth: "90vw",
-    height: "calc(100vh - 180px)", // Reserve space for status bar and button
-  },
-  imgFrame: { 
-    width: "100%", 
-    flex: 1, // Take up available space
-    background: "rgba(255,255,255,0.02)", 
-    borderRadius: 24, 
-    padding: 8, 
-    border: "1px solid rgba(255,255,255,0.1)", 
-    marginBottom: 12, 
-    display: "flex", 
-    justifyContent: "center", 
-    alignItems: "center",
-    overflow: "hidden",
-    minHeight: 0, // Important for flex child
-  },
-  img: { 
-    maxWidth: "100%", 
-    maxHeight: "100%", 
-    width: "auto",
-    height: "auto",
-    borderRadius: 20, 
-    objectFit: "contain", // Ensures no cropping
-    display: "block" 
-  },
-  
-  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center' },
-  finalText: { 
-    fontSize: "clamp(1.4rem, 6vw, 2.2rem)", background: "linear-gradient(to bottom, #FFD700, #fff0a8)", 
-    WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", 
-    lineHeight: 1.2, margin: "10px 0", textAlign: "center" 
-  }
-};
