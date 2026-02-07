@@ -194,12 +194,21 @@ export default function App() {
                 variants={glowVariants}
                 whileHover="hover"
                 whileTap="tap"
-                onClick={() => selectAnswer(i)}
+                onClick={() => {
+                  if (questions[qIndex].finale && i === 3) {
+                    moveNoButton();
+                  } else {
+                    selectAnswer(i);
+                  }
+                }}
                 onMouseEnter={() => {
                   if (questions[qIndex].finale && i === 3) moveNoButton();
                 }}
-                onTouchStart={() => {
-                  if (questions[qIndex].finale && i === 3) moveNoButton();
+                onTouchStart={(e) => {
+                  if (questions[qIndex].finale && i === 3) {
+                    e.preventDefault();
+                    moveNoButton();
+                  }
                 }}
                 style={{
                     ...styles.option,
