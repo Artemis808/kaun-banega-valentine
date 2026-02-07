@@ -63,6 +63,7 @@ export default function App() {
   const [hearts, setHearts] = useState(0);
   const [displayHearts, setDisplayHearts] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [noButtonPos, setNoButtonPos] = useState({ x: 0, y: 0 });
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
   const correctAudio = useRef(null);
@@ -88,6 +89,11 @@ export default function App() {
       popAudio.current.currentTime = 0;
       popAudio.current.play().catch(() => {});
     }
+  };
+  const moveNoButton = () => {
+    const randomX = (Math.random() - 0.5) * 200;
+    const randomY = (Math.random() - 0.5) * 200;
+    setNoButtonPos({ x: randomX, y: randomY });
   };
   const handleUnlock = () => {
     triggerHaptic();
@@ -129,6 +135,7 @@ export default function App() {
     setHearts(0);
     setDisplayHearts(0);
     setSelected(null);
+    setNoButtonPos({ x: 0, y: 0 });
   };
   useEffect(() => {
     if (displayHearts === hearts) return;
@@ -149,7 +156,7 @@ export default function App() {
     return (
       <div style={styles.loader}>
         <motion.div {...pulseAnim} onClick={handleUnlock} style={{ cursor: "pointer", fontSize: 100 }} whileTap={{ scale: 0.8 }}>❤️</motion.div>
-        <p style={styles.subText}>Unlock Our Story</p>
+        <p style={styles.subText}>Touch to Begin</p>
       </div>
     );
   }
@@ -184,9 +191,20 @@ export default function App() {
                 whileHover="hover"
                 whileTap="tap"
                 onClick={() => selectAnswer(i)}
+                onMouseEnter={() => {
+                  if (questions[qIndex].finale && i === 3) moveNoButton();
+                }}
+                onTouchStart={() => {
+                  if (questions[qIndex].finale && i === 3) moveNoButton();
+                }}
                 style={{
                     ...styles.option,
-                    ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})
+                    ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {}),
+                    ...(questions[qIndex].finale && i === 3 ? {
+                      position: 'relative',
+                      transform: `translate(${noButtonPos.x}px, ${noButtonPos.y}px)`,
+                      transition: 'transform 0.3s ease'
+                    } : {})
                 }}
               >
                 {opt}
