@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 
-// --- QUESTION DATA ---
+// --- CONTENT ---
 const questions = [
   {
     question: "What is Sarangae and why is stuck in my mind from my first impression of you?",
@@ -40,9 +40,22 @@ const questions = [
   },
 ];
 
-const pulse = {
-  animate: { scale: [1, 1.05, 1] },
-  transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+// --- ANIMATION VARIANTS ---
+const pulseAnim = {
+  animate: { 
+    scale: [1, 1.15, 1],
+    opacity: [0.8, 1, 0.8]
+  },
+  transition: { 
+    duration: 1.5, 
+    repeat: Infinity, 
+    ease: "easeInOut" 
+  }
+};
+
+const glowVariants = {
+  hover: { scale: 1.02, filter: "brightness(1.2) drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))" },
+  tap: { scale: 0.98, filter: "brightness(1.5) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8))" }
 };
 
 export default function App() {
@@ -69,26 +82,18 @@ export default function App() {
     finaleAudio.current = new Audio("/music/finale.mp3");
     popAudio.current = new Audio("/music/pop.mp3");
     questionAudio.current.loop = true;
-
-    return () => stopAllAudio();
   }, []);
 
   const stopAllAudio = () => {
-    const audios = [openingAudio, questionAudio, correctAudio, finaleAudio];
-    audios.forEach(ref => {
-      if (ref.current) {
-        ref.current.pause();
-        ref.current.currentTime = 0;
-      }
+    [openingAudio, questionAudio, correctAudio, finaleAudio].forEach(ref => {
+      if (ref.current) { ref.current.pause(); ref.current.currentTime = 0; }
     });
   };
 
   const triggerHaptic = () => {
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate(15);
-    }
+    if (navigator.vibrate) navigator.vibrate(15);
     if (popAudio.current) {
-      popAudio.current.volume = 0.4;
+      popAudio.current.volume = 0.3;
       popAudio.current.currentTime = 0;
       popAudio.current.play().catch(() => {});
     }
@@ -97,7 +102,7 @@ export default function App() {
   const handleUnlock = () => {
     triggerHaptic();
     setStage("intro");
-    openingAudio.current?.play().catch(e => console.log("Audio play blocked", e));
+    openingAudio.current?.play();
     setTimeout(() => setShowStartBtn(true), 4000);
   };
 
@@ -105,7 +110,7 @@ export default function App() {
     triggerHaptic();
     openingAudio.current?.pause();
     questionAudio.current.volume = 0.4;
-    questionAudio.current?.play().catch(() => {});
+    questionAudio.current?.play();
     setStage("quiz");
   };
 
@@ -124,7 +129,7 @@ export default function App() {
       if (questions[qIndex].finale) {
         questionAudio.current?.pause();
         finaleAudio.current.volume = 0.8;
-        finaleAudio.current?.play().catch(() => {});
+        finaleAudio.current?.play();
         confetti({ particleCount: 200, spread: 160, origin: { y: 0.6 } });
       }
     }, 800);
@@ -134,30 +139,11 @@ export default function App() {
     triggerHaptic();
     stopAllAudio();
     setStage("lock");
-    setShowStartBtn(false);
     setQIndex(0);
     setRevealed(false);
-    setTimer(15);
     setHearts(0);
     setDisplayHearts(0);
     setSelected(null);
-    setRunaway({ x: 0, y: 0, scale: 1 });
-  };
-
-  const nextQuestion = () => {
-    triggerHaptic();
-    setSelected(null);
-    setRevealed(false);
-    setQIndex(p => p + 1);
-    setRunaway({ x: 0, y: 0, scale: 1 });
-  };
-
-  const moveNo = () => {
-    setRunaway({
-      x: Math.random() * 100 - 50,
-      y: Math.random() * 100 - 50,
-      scale: runaway.scale * 0.95
-    });
   };
 
   useEffect(() => {
@@ -177,14 +163,13 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, stage, revealed]);
 
-  // Check if we are showing the final image
-  const isFinalPage = qIndex === questions.length - 1 && revealed;
+  // --- RENDER HELPERS ---
 
   if (stage === "lock") {
     return (
       <div style={styles.loader}>
-        <motion.div {...pulse} onClick={handleUnlock} style={{ cursor: "pointer", fontSize: 100 }} whileTap={{ scale: 0.8 }}>❤️</motion.div>
-        <p style={styles.subText}>Tap to start our story</p>
+        <motion.div {...pulseAnim} onClick={handleUnlock} style={{ cursor: "pointer", fontSize: 100 }} whileTap={{ scale: 0.8 }}>❤️</motion.div>
+        <p style={styles.subText}>Unlock Our Story</p>
       </div>
     );
   }
@@ -192,11 +177,11 @@ export default function App() {
   if (stage === "intro") {
     return (
       <div style={styles.loader}>
-        <motion.img src="/kbv-logo.png" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ width: 180 }} />
+        <motion.img src="/kbv-logo.png" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ width: 160 }} />
         {showStartBtn ? (
-          <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={startQuiz} style={styles.btn}>Enter Experience ❤️</motion.button>
+          <motion.button whileHover="hover" whileTap="tap" variants={glowVariants} onClick={startQuiz} style={styles.btn}>Begin ❤️</motion.button>
         ) : (
-          <p style={styles.subText}>Cue the music...</p>
+          <p style={styles.subText}>Setting the mood...</p>
         )}
       </div>
     );
@@ -204,39 +189,45 @@ export default function App() {
 
   return (
     <div style={styles.bg}>
+      {/* SLIM FLOATING STATUS BAR */}
       <div style={styles.statusBar}>
         <div style={styles.statusItem}>⏳ {timer}s</div>
-        <div style={styles.statusItem}>
-          ❤️ {displayHearts}% {displayHearts === 69 && <span style={{marginLeft: 4, fontSize: '0.85rem'}}>(nice)</span>}
-        </div>
+        <motion.div {...pulseAnim} style={{...styles.statusItem, color: '#ff4d4d'}}>
+           ❤️ {displayHearts}% {displayHearts === 69 && <span style={styles.niceText}>(nice)</span>}
+        </motion.div>
       </div>
 
       <AnimatePresence mode="wait">
         {!revealed ? (
           <motion.div key={`q-${qIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
             <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
-            {questions[qIndex].options.map((opt, i) => {
-              if (questions[qIndex].finale && i === 3) {
-                return (
-                  <motion.button key={i} animate={runaway} onMouseEnter={moveNo} onTouchStart={moveNo} style={{...styles.option, background: "#ff4d4d", border: "none"}}>{opt}</motion.button>
-                );
-              }
-              return (
-                <motion.button key={i} onClick={() => selectAnswer(i)} whileHover={{ scale: 1.02, background: "rgba(255,255,255,0.12)" }} whileTap={{ scale: 0.98 }} style={{...styles.option, ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})}}>{opt}</motion.button>
-              );
-            })}
+            {questions[qIndex].options.map((opt, i) => (
+              <motion.button
+                key={i}
+                variants={glowVariants}
+                whileHover="hover"
+                whileTap="tap"
+                onClick={() => selectAnswer(i)}
+                style={{
+                    ...styles.option,
+                    ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})
+                }}
+              >
+                {opt}
+              </motion.button>
+            ))}
           </motion.div>
         ) : (
-          <motion.div key={`img-${qIndex}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
-            <div style={{...styles.imgFrame, maxHeight: isFinalPage ? "45vh" : "62vh"}}>
+          <motion.div key={`img-${qIndex}`} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
+            <div style={{...styles.imgFrame, maxHeight: qIndex === questions.length - 1 ? "45vh" : "68vh"}}>
                 <img src={questions[qIndex].image} style={styles.img} alt="Memory" />
             </div>
             {qIndex < questions.length - 1 ? (
-              <motion.button whileHover={{ scale: 1.05 }} onClick={nextQuestion} style={styles.btn}>Continue ❤️</motion.button>
+              <motion.button variants={glowVariants} whileHover="hover" whileTap="tap" onClick={() => {triggerHaptic(); setRevealed(false); setQIndex(p=>p+1); setSelected(null);}} style={styles.btn}>Next ❤️</motion.button>
             ) : (
               <div style={styles.finalCenter}>
-                <h1 style={styles.finalText}>Happy Valentine’s Day <br/> To My Forever Partner ❤️</h1>
-                <motion.button whileHover={{ scale: 1.05 }} onClick={fullRestart} style={{...styles.btn, marginBottom: 20}}>Replay ❤️</motion.button>
+                <h1 style={styles.finalText}>Happy Valentine’s Day My Forever ❤️</h1>
+                <motion.button variants={glowVariants} whileHover="hover" whileTap="tap" onClick={fullRestart} style={styles.btn}>Replay ❤️</motion.button>
               </div>
             )}
           </motion.div>
@@ -246,20 +237,52 @@ export default function App() {
   );
 }
 
+// --- UPDATED STYLES ---
 const styles = {
-  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20, textAlign: 'center' },
-  subText: { color: "rgba(255,255,255,0.6)", fontSize: 14, letterSpacing: 1 },
-  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1e003a, #000 80%)", color: "white", padding: "80px 15px 20px", display: "flex", flexDirection: "column", alignItems: "center", overflowX: "hidden" },
-  statusBar: { position: "fixed", top: 15, width: "90%", maxWidth: 420, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(15px)", borderRadius: 30, padding: "12px 20px", display: "flex", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.15)", zIndex: 100 },
-  statusItem: { fontWeight: "bold", fontSize: 16, display: 'flex', alignItems: 'center' },
-  card: { width: "100%", maxWidth: 450, background: "rgba(255,255,255,0.05)", borderRadius: 28, padding: 25, border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)" },
-  questionText: { fontSize: "1.25rem", textAlign: "center", marginBottom: 25, lineHeight: 1.4 },
-  option: { width: "100%", padding: "16px", marginTop: 12, borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", cursor: "pointer", textAlign: "left", fontSize: "1rem" },
-  correct: { background: "linear-gradient(90deg, #FFD700, #FFA500)", color: "black", fontWeight: "bold", border: "none", boxShadow: "0 0 25px rgba(255, 215, 0, 0.5)" },
-  btn: { padding: "16px 40px", borderRadius: 50, border: "none", background: "white", color: "black", fontWeight: "bold", fontSize: 18, cursor: "pointer", marginTop: 10, boxShadow: "0 10px 20px rgba(0,0,0,0.3)" },
-  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 500 },
-  imgFrame: { width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 24, padding: 6, border: "1px solid rgba(255,255,255,0.1)", marginBottom: 10, display: "flex", justifyContent: "center", overflow: "hidden" },
-  img: { width: "100%", height: "auto", borderRadius: 18, objectFit: "contain" },
-  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center', gap: 5 },
-  finalText: { fontSize: "clamp(1.4rem, 6vw, 2rem)", background: "linear-gradient(to right, #FFD700, #fff0a8)", WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", lineHeight: 1.2, margin: "10px 0" }
+  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20 },
+  subText: { color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' },
+  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1a0033, #000 90%)", color: "white", padding: "70px 15px 30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden" },
+  
+  // Floating Slim Status Bar
+  statusBar: { 
+    position: "fixed", top: 15, width: "85%", maxWidth: 350, 
+    background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", 
+    borderRadius: 40, padding: "8px 20px", display: "flex", 
+    justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.1)", zIndex: 100 
+  },
+  statusItem: { fontWeight: "bold", fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 },
+  niceText: { fontSize: '0.7rem', color: '#FFD700', marginLeft: 2 },
+
+  card: { width: "100%", maxWidth: 420, background: "rgba(255,255,255,0.04)", borderRadius: 30, padding: 25, border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)" },
+  questionText: { fontSize: "1.2rem", textAlign: "center", marginBottom: 20, lineHeight: 1.4, fontWeight: "500" },
+  
+  option: { 
+    width: "100%", padding: "16px", marginTop: 10, borderRadius: 18, 
+    border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", 
+    color: "white", cursor: "pointer", textAlign: "left", fontSize: "0.95rem",
+    transition: "all 0.2s ease" 
+  },
+  correct: { background: "linear-gradient(90deg, #FFD700, #FFA500)", color: "black", fontWeight: "bold", border: "none" },
+  
+  btn: { 
+    padding: "15px 45px", borderRadius: 50, border: "none", background: "white", 
+    color: "black", fontWeight: "bold", fontSize: 16, cursor: "pointer", 
+    marginTop: 15, boxShadow: "0 8px 20px rgba(0,0,0,0.4)" 
+  },
+
+  // Image Layout
+  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 480 },
+  imgFrame: { 
+    width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 30, 
+    padding: 6, border: "1px solid rgba(255,255,255,0.1)", marginBottom: 12, 
+    display: "flex", justifyContent: "center", overflow: "hidden" 
+  },
+  img: { width: "100%", height: "100%", borderRadius: 24, objectFit: "cover", display: "block" },
+  
+  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center' },
+  finalText: { 
+    fontSize: "clamp(1.4rem, 6vw, 2.2rem)", background: "linear-gradient(to bottom, #FFD700, #fff0a8)", 
+    WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", 
+    lineHeight: 1.2, margin: "10px 0", textAlign: "center" 
+  }
 };
