@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "veo-animation"; // Note: Standard Framer Motion is usually used here
-import { motion as m, AnimatePresence as AP } from "framer-motion";
+import React, { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 
 // --- QUESTION DATA ---
@@ -42,7 +41,7 @@ const questions = [
 ];
 
 const pulse = {
-  animate: { scale: [1, 1.08, 1] },
+  animate: { scale: [1, 1.05, 1] },
   transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
 };
 
@@ -70,10 +69,13 @@ export default function App() {
     finaleAudio.current = new Audio("/music/finale.mp3");
     popAudio.current = new Audio("/music/pop.mp3");
     questionAudio.current.loop = true;
+
+    return () => stopAllAudio();
   }, []);
 
   const stopAllAudio = () => {
-    [openingAudio, questionAudio, correctAudio, finaleAudio].forEach(ref => {
+    const audios = [openingAudio, questionAudio, correctAudio, finaleAudio];
+    audios.forEach(ref => {
       if (ref.current) {
         ref.current.pause();
         ref.current.currentTime = 0;
@@ -82,7 +84,9 @@ export default function App() {
   };
 
   const triggerHaptic = () => {
-    if (navigator.vibrate) navigator.vibrate(15);
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(15);
+    }
     if (popAudio.current) {
       popAudio.current.volume = 0.4;
       popAudio.current.currentTime = 0;
@@ -93,15 +97,15 @@ export default function App() {
   const handleUnlock = () => {
     triggerHaptic();
     setStage("intro");
-    openingAudio.current.play();
+    openingAudio.current?.play().catch(e => console.log("Audio play blocked", e));
     setTimeout(() => setShowStartBtn(true), 4000);
   };
 
   const startQuiz = () => {
     triggerHaptic();
-    openingAudio.current.pause();
+    openingAudio.current?.pause();
     questionAudio.current.volume = 0.4;
-    questionAudio.current.play();
+    questionAudio.current?.play().catch(() => {});
     setStage("quiz");
   };
 
@@ -118,9 +122,9 @@ export default function App() {
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.3 } });
 
       if (questions[qIndex].finale) {
-        questionAudio.current.pause();
+        questionAudio.current?.pause();
         finaleAudio.current.volume = 0.8;
-        finaleAudio.current.play();
+        finaleAudio.current?.play().catch(() => {});
         confetti({ particleCount: 200, spread: 160, origin: { y: 0.6 } });
       }
     }, 800);
@@ -150,9 +154,9 @@ export default function App() {
 
   const moveNo = () => {
     setRunaway({
-      x: Math.random() * 120 - 60,
-      y: Math.random() * 120 - 60,
-      scale: runaway.scale * 0.9
+      x: Math.random() * 100 - 50,
+      y: Math.random() * 100 - 50,
+      scale: runaway.scale * 0.95
     });
   };
 
@@ -173,7 +177,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, stage, revealed]);
 
+  // Check if we are showing the final image
   const isFinalPage = qIndex === questions.length - 1 && revealed;
+
+  if (stage === "lock") {
+    return (
+      <div style={styles.loader}>
+        <motion.div {...pulse} onClick={handleUnlock} style={{ cursor: "pointer", fontSize: 100 }} whileTap={{ scale: 0.8 }}>❤️</motion.div>
+        <p style={styles.subText}>Tap to start our story</p>
+      </div>
+    );
+  }
+
+  if (stage === "intro") {
+    return (
+      <div style={styles.loader}>
+        <motion.img src="/kbv-logo.png" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ width: 180 }} />
+        {showStartBtn ? (
+          <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={startQuiz} style={styles.btn}>Enter Experience ❤️</motion.button>
+        ) : (
+          <p style={styles.subText}>Cue the music...</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={styles.bg}>
@@ -184,77 +211,55 @@ export default function App() {
         </div>
       </div>
 
-      <AP mode="wait">
+      <AnimatePresence mode="wait">
         {!revealed ? (
-          <m.div key={qIndex} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
+          <motion.div key={`q-${qIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
             <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
             {questions[qIndex].options.map((opt, i) => {
               if (questions[qIndex].finale && i === 3) {
                 return (
-                  <m.button key={i} animate={runaway} onMouseEnter={moveNo} onTouchStart={moveNo} style={{...styles.option, background: "#ff4d4d", border: "none"}}>{opt}</m.button>
+                  <motion.button key={i} animate={runaway} onMouseEnter={moveNo} onTouchStart={moveNo} style={{...styles.option, background: "#ff4d4d", border: "none"}}>{opt}</motion.button>
                 );
               }
               return (
-                <m.button key={i} onClick={() => selectAnswer(i)} whileHover={{ scale: 1.02, background: "rgba(255,255,255,0.12)" }} whileTap={{ scale: 0.98 }} style={{...styles.option, ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})}}>{opt}</m.button>
+                <motion.button key={i} onClick={() => selectAnswer(i)} whileHover={{ scale: 1.02, background: "rgba(255,255,255,0.12)" }} whileTap={{ scale: 0.98 }} style={{...styles.option, ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})}}>{opt}</motion.button>
               );
             })}
-          </m.div>
+          </motion.div>
         ) : (
-          <m.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
-            {/* The Image is slightly smaller on the final page to make room for text + button */}
-            <div style={{...styles.imgFrame, maxHeight: isFinalPage ? "45vh" : "65vh"}}>
+          <motion.div key={`img-${qIndex}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
+            <div style={{...styles.imgFrame, maxHeight: isFinalPage ? "45vh" : "62vh"}}>
                 <img src={questions[qIndex].image} style={styles.img} alt="Memory" />
             </div>
-            
             {qIndex < questions.length - 1 ? (
-              <m.button whileHover={{ scale: 1.05 }} onClick={nextQuestion} style={styles.btn}>Continue ❤️</m.button>
+              <motion.button whileHover={{ scale: 1.05 }} onClick={nextQuestion} style={styles.btn}>Continue ❤️</motion.button>
             ) : (
               <div style={styles.finalCenter}>
                 <h1 style={styles.finalText}>Happy Valentine’s Day <br/> To My Forever Partner ❤️</h1>
-                <m.button whileHover={{ scale: 1.05 }} onClick={fullRestart} style={styles.btn}>Replay ❤️</m.button>
+                <motion.button whileHover={{ scale: 1.05 }} onClick={fullRestart} style={{...styles.btn, marginBottom: 20}}>Replay ❤️</motion.button>
               </div>
             )}
-          </m.div>
+          </motion.div>
         )}
-      </AP>
+      </AnimatePresence>
     </div>
   );
 }
 
-// --- STYLES ---
 const styles = {
-  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20 },
+  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20, textAlign: 'center' },
   subText: { color: "rgba(255,255,255,0.6)", fontSize: 14, letterSpacing: 1 },
-  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1e003a, #000 80%)", color: "white", padding: "80px 15px 40px", display: "flex", flexDirection: "column", alignItems: "center", overflowX: "hidden" },
-  statusBar: { position: "fixed", top: 15, width: "92%", maxWidth: 420, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(15px)", borderRadius: 30, padding: "12px 25px", display: "flex", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.15)", zIndex: 100 },
+  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1e003a, #000 80%)", color: "white", padding: "80px 15px 20px", display: "flex", flexDirection: "column", alignItems: "center", overflowX: "hidden" },
+  statusBar: { position: "fixed", top: 15, width: "90%", maxWidth: 420, background: "rgba(255,255,255,0.1)", backdropFilter: "blur(15px)", borderRadius: 30, padding: "12px 20px", display: "flex", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.15)", zIndex: 100 },
   statusItem: { fontWeight: "bold", fontSize: 16, display: 'flex', alignItems: 'center' },
   card: { width: "100%", maxWidth: 450, background: "rgba(255,255,255,0.05)", borderRadius: 28, padding: 25, border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)" },
   questionText: { fontSize: "1.25rem", textAlign: "center", marginBottom: 25, lineHeight: 1.4 },
-  option: { width: "100%", padding: "18px", marginTop: 12, borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", cursor: "pointer", textAlign: "left", fontSize: "1rem" },
+  option: { width: "100%", padding: "16px", marginTop: 12, borderRadius: 16, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", cursor: "pointer", textAlign: "left", fontSize: "1rem" },
   correct: { background: "linear-gradient(90deg, #FFD700, #FFA500)", color: "black", fontWeight: "bold", border: "none", boxShadow: "0 0 25px rgba(255, 215, 0, 0.5)" },
   btn: { padding: "16px 40px", borderRadius: 50, border: "none", background: "white", color: "black", fontWeight: "bold", fontSize: 18, cursor: "pointer", marginTop: 10, boxShadow: "0 10px 20px rgba(0,0,0,0.3)" },
-  
-  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 500, justifyContent: 'center' },
-  imgFrame: { 
-    width: "100%", 
-    background: "rgba(255,255,255,0.05)", 
-    borderRadius: 24, 
-    padding: 8, 
-    border: "1px solid rgba(255,255,255,0.1)",
-    marginBottom: 10,
-    display: "flex",
-    justifyContent: "center",
-    overflow: "hidden",
-    transition: "max-height 0.3s ease" // Smooth transition when finale hits
-  },
-  img: { 
-    width: "100%", 
-    height: "100%",
-    borderRadius: 18, 
-    objectFit: "contain", 
-    display: "block"
-  },
-  
-  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center', gap: 5, padding: "0 10px" },
-  finalText: { fontSize: "clamp(1.5rem, 7vw, 2.2rem)", background: "linear-gradient(to right, #FFD700, #fff0a8)", WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", lineHeight: 1.2, margin: "10px 0" }
+  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 500 },
+  imgFrame: { width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 24, padding: 6, border: "1px solid rgba(255,255,255,0.1)", marginBottom: 10, display: "flex", justifyContent: "center", overflow: "hidden" },
+  img: { width: "100%", height: "auto", borderRadius: 18, objectFit: "contain" },
+  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center', gap: 5 },
+  finalText: { fontSize: "clamp(1.4rem, 6vw, 2rem)", background: "linear-gradient(to right, #FFD700, #fff0a8)", WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", lineHeight: 1.2, margin: "10px 0" }
 };
