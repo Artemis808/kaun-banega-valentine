@@ -63,7 +63,7 @@ export default function App() {
   const [hearts, setHearts] = useState(0);
   const [displayHearts, setDisplayHearts] = useState(0);
   const [selected, setSelected] = useState(null);
-  const [noButtonPos, setNoButtonPos] = useState({ x: 0, y: 0 });
+  const [noButtonPos, setNoButtonPos] = useState({ x: 0, y: 0, scale: 1 });
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
   const correctAudio = useRef(null);
@@ -93,7 +93,11 @@ export default function App() {
   const moveNoButton = () => {
     const randomX = (Math.random() - 0.5) * 200;
     const randomY = (Math.random() - 0.5) * 200;
-    setNoButtonPos({ x: randomX, y: randomY });
+    setNoButtonPos(prev => ({ 
+      x: randomX, 
+      y: randomY,
+      scale: Math.max(0.3, (prev.scale || 1) - 0.15) // Shrink progressively but not below 0.3
+    }));
   };
   const handleUnlock = () => {
     triggerHaptic();
@@ -135,7 +139,7 @@ export default function App() {
     setHearts(0);
     setDisplayHearts(0);
     setSelected(null);
-    setNoButtonPos({ x: 0, y: 0 });
+    setNoButtonPos({ x: 0, y: 0, scale: 1 });
   };
   useEffect(() => {
     if (displayHearts === hearts) return;
@@ -202,8 +206,11 @@ export default function App() {
                     ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {}),
                     ...(questions[qIndex].finale && i === 3 ? {
                       position: 'relative',
-                      transform: `translate(${noButtonPos.x}px, ${noButtonPos.y}px)`,
-                      transition: 'transform 0.3s ease'
+                      transform: `translate(${noButtonPos.x}px, ${noButtonPos.y}px) scale(${noButtonPos.scale})`,
+                      transition: 'transform 0.3s ease',
+                      background: 'rgba(255, 0, 0, 0.2)',
+                      border: '1px solid rgba(255, 0, 0, 0.4)',
+                      color: '#ff6b6b'
                     } : {})
                 }}
               >
