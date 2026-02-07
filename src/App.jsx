@@ -4,19 +4,31 @@ import confetti from "canvas-confetti";
 
 const questions = [
   {
-    question: "What is Sarangae and why is stuck in my mind from my first impression of you?",
-    options: ["BTS for the win!", "Saran-gayyyy", "Both b and c", "I love you bb"],
+    question:
+      "What is Sarangae and why is stuck in my mind from my first impression of you?",
+    options: [
+      "BTS for the win!",
+      "Saran-gayyyy",
+      "Both b and c",
+      "I love you bb",
+    ],
     correct: [3],
     image: "/kbv-images/1.jpg",
   },
   {
     question: "What was technically the first meal you made for me?",
-    options: ["You is a snacc", "Bheja fryyy", "Pepper Chicken", "Poha with veggies"],
+    options: [
+      "You is a snacc",
+      "Bheja fryyy",
+      "Pepper Chicken",
+      "Poha with veggies",
+    ],
     correct: [2],
     image: "/kbv-images/2.jpg",
   },
   {
-    question: "If not for your current job, which job would you be perfect for?",
+    question:
+      "If not for your current job, which job would you be perfect for?",
     options: [
       "Fasshun model",
       "Interior designer",
@@ -30,8 +42,14 @@ const questions = [
     image: "/kbv-images/3.jpg",
   },
   {
-    question: "At what moment did I realize my life had quietly changed forever?",
-    options: ["Kantara Day", "All the 11:11s", "Cubbon park", "Our first 31/12"],
+    question:
+      "At what moment did I realize my life had quietly changed forever?",
+    options: [
+      "Kantara Day",
+      "All the 11:11s",
+      "Cubbon park",
+      "Our first 31/12",
+    ],
     correct: [0, 1, 2, 3],
     image: "/kbv-images/4.jpg",
   },
@@ -45,7 +63,7 @@ const questions = [
 ];
 
 export default function App() {
-  const [interacted, setInteracted] = useState(false); // New state for audio unlock
+  const [soundUnlocked, setSoundUnlocked] = useState(false);
   const [started, setStarted] = useState(false);
   const [qIndex, setQIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -62,7 +80,6 @@ export default function App() {
 
   const q = questions[qIndex];
 
-  // PRELOAD ASSETS
   useEffect(() => {
     questions.forEach((q) => {
       const img = new Image();
@@ -77,9 +94,10 @@ export default function App() {
     questionAudio.current.loop = true;
   }, []);
 
-  // LOVE METER SMOOTH COUNT
+  // Smooth Love Meter
   useEffect(() => {
     if (displayHearts === hearts) return;
+
     const interval = setInterval(() => {
       setDisplayHearts((prev) => {
         if (prev >= hearts) {
@@ -89,13 +107,16 @@ export default function App() {
         return prev + 1;
       });
     }, 18);
+
     return () => clearInterval(interval);
   }, [hearts]);
 
-  // TIMER
+  // Timer
   useEffect(() => {
     if (!started || revealed) return;
+
     setTimer(15);
+
     const interval = setInterval(() => {
       setTimer((t) => {
         if (t <= 1) {
@@ -106,34 +127,34 @@ export default function App() {
         return t - 1;
       });
     }, 1000);
+
     return () => clearInterval(interval);
   }, [qIndex, started, revealed]);
 
-  // PHASE 1: UNLOCK AUDIO
-  const handleInteraction = () => {
-    setInteracted(true);
-    // Play & Pause immediately to "unlock" the audio context
-    openingAudio.current.play().then(() => {
-        openingAudio.current.pause();
-        openingAudio.current.currentTime = 0;
-    }).catch(e => console.log("Audio play blocked", e));
+  // SOUND UNLOCK
+  const unlockSound = async () => {
+    try {
+      await openingAudio.current.play();
+      openingAudio.current.pause();
+      openingAudio.current.currentTime = 0;
+
+      setSoundUnlocked(true);
+    } catch {
+      setSoundUnlocked(true);
+    }
   };
 
-  // PHASE 2: START EXPERIENCE
-  const startGame = async () => {
-    try {
-      openingAudio.current.volume = 0.6;
-      await openingAudio.current.play();
+  const startExperience = async () => {
+    openingAudio.current.volume = 0.6;
+    questionAudio.current.volume = 0.35;
 
-      setTimeout(() => {
-        questionAudio.current.volume = 0.35;
-        questionAudio.current.play();
-      }, 2500);
+    openingAudio.current.play();
 
-      setStarted(true);
-    } catch {
-      setStarted(true);
-    }
+    setTimeout(() => {
+      questionAudio.current.play();
+    }, 2500);
+
+    setStarted(true);
   };
 
   const selectAnswer = (i) => {
@@ -142,6 +163,7 @@ export default function App() {
 
     setTimeout(() => {
       setRevealed(true);
+
       const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
       setHearts(percent);
 
@@ -154,6 +176,7 @@ export default function App() {
       if (q.finale) {
         questionAudio.current.pause();
         finaleAudio.current.play();
+
         confetti({
           particleCount: 220,
           spread: 140,
@@ -167,50 +190,38 @@ export default function App() {
     setSelected(null);
     setRevealed(false);
     setQIndex((p) => p + 1);
-    setRunaway({ x: 0, y: 0, scale: 1 });
   };
 
   const restartGame = () => {
     finaleAudio.current?.pause();
     questionAudio.current?.pause();
-    if (finaleAudio.current) finaleAudio.current.currentTime = 0;
-    if (questionAudio.current) questionAudio.current.currentTime = 0;
 
+    setSoundUnlocked(false);
+    setStarted(false);
     setQIndex(0);
     setHearts(0);
     setDisplayHearts(0);
     setSelected(null);
     setRevealed(false);
-    setStarted(false);
-    setInteracted(false); // Go all the way back to the very first heart
   };
 
-  const moveNo = () => {
-    setRunaway({
-      x: Math.random() * 250 - 125,
-      y: Math.random() * 200 - 100,
-      scale: runaway.scale * 0.8,
-    });
-  };
-
-  // SCREEN 1: AUDIO UNLOCKER
-  if (!interacted) {
+  // SOUND SCREEN
+  if (!soundUnlocked) {
     return (
       <div style={styles.loader}>
         <motion.div
           animate={{ scale: [1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 1.5 }}
-          onClick={handleInteraction}
-          style={{ cursor: "pointer", fontSize: 80 }}
+          style={styles.soundButton}
+          onClick={unlockSound}
         >
-          ❤️
+          🔊 Tap To Enable Sound ❤️
         </motion.div>
-        <p style={{ color: "white", opacity: 0.6, fontSize: 14 }}>Click the heart to enable sound</p>
       </div>
     );
   }
 
-  // SCREEN 2: LOGO INTRO
+  // LOGO SCREEN
   if (!started) {
     return (
       <div style={styles.loader}>
@@ -219,27 +230,18 @@ export default function App() {
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 1.2 }}
-          style={{ width: 180 }}
+          style={{ width: 200 }}
         />
-        <motion.button
-          onClick={startGame}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          style={styles.beginBtn}
-        >
-          Enter The Experience ❤️
-        </motion.button>
+
+        <button style={styles.beginBtn} onClick={startExperience}>
+          Begin ❤️
+        </button>
       </div>
     );
   }
 
-  // MAIN GAME UI
   return (
     <div style={styles.bg}>
-      {q.finale && !revealed && <div style={styles.spotlight} />}
-
-      {/* LOVE METER */}
       <motion.div
         style={styles.heart}
         animate={{ scale: [1, 1.15, 1] }}
@@ -257,66 +259,48 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.45 }}
             style={styles.card}
           >
-            <h2 style={styles.questionText}>{q.question}</h2>
+            <h2>{q.question}</h2>
 
-            {q.options.map((opt, i) => {
-              const runawayBtn = q.finale && i === 3;
-              if (runawayBtn) {
-                return (
-                  <motion.button
-                    key={i}
-                    style={styles.no}
-                    animate={runaway}
-                    onMouseEnter={moveNo}
-                    onClick={moveNo}
-                  >
-                    {opt}
-                  </motion.button>
-                );
-              }
-
-              const isCorrect = q.correct.includes(i);
-              const isSelected = selected === i;
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => selectAnswer(i)}
-                  style={{
-                    ...styles.option,
-                    ...(isSelected && isCorrect && styles.correctSelected),
-                  }}
-                >
-                  {opt}
-                </button>
-              );
-            })}
+            {q.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => selectAnswer(i)}
+                style={{
+                  ...styles.option,
+                  ...(selected === i &&
+                    q.correct.includes(i) && {
+                      background: "linear-gradient(45deg,#FFD700,#fff0a8)",
+                      boxShadow: "0 0 30px gold",
+                      transform: "scale(1.06)",
+                    }),
+                }}
+              >
+                {opt}
+              </button>
+            ))}
           </motion.div>
         ) : (
-          <motion.div
-            key="image"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            style={styles.center}
-          >
-            <img src={q.image} style={styles.image} alt="Memory" />
+          <motion.div style={styles.center}>
+            <img src={q.image} style={styles.image} />
 
             {qIndex < questions.length - 1 ? (
               <button style={styles.beginBtn} onClick={next}>
                 Continue ❤️
               </button>
             ) : (
-              <div style={styles.finalWrapper}>
+              <>
                 <h1 style={styles.finalText}>
-                  ❤️ Happy Valentine’s Day <br /> To My Forever Valentine ❤️
+                  ❤️ Happy Valentine’s Day  
+                  <br />
+                  To My Forever Valentine ❤️
                 </h1>
+
                 <button style={styles.beginBtn} onClick={restartGame}>
-                  Back to Start ❤️
+                  Back To Start ❤️
                 </button>
-              </div>
+              </>
             )}
           </motion.div>
         )}
@@ -330,36 +314,32 @@ const styles = {
     height: "100vh",
     background: "black",
     display: "flex",
-    flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    gap: 30,
+    flexDirection: "column",
+    gap: 40,
+  },
+  soundButton: {
+    padding: "20px 36px",
+    borderRadius: 20,
+    background: "linear-gradient(45deg,#ff4d6d,#ff758f)",
+    cursor: "pointer",
+    fontSize: 20,
+    fontWeight: "700",
   },
   bg: {
     minHeight: "100vh",
-    background: "radial-gradient(circle at center, #14003a, #060012 60%, black)",
+    background:
+      "radial-gradient(circle at center, #14003a, #060012 60%, black)",
     color: "white",
-    padding: "80px 20px 20px 20px", // Increased top padding to avoid meter overlap
-    boxSizing: "border-box",
-  },
-  spotlight: {
-    position: "fixed",
-    inset: 0,
-    background: "radial-gradient(circle at center, transparent 150px, rgba(0,0,0,0.94))",
-    pointerEvents: "none",
+    padding: 20,
   },
   card: {
-    maxWidth: 500,
+    maxWidth: 650,
     margin: "auto",
-    background: "rgba(0,0,0,0.75)",
-    padding: 25,
+    background: "rgba(0,0,0,0.65)",
+    padding: 30,
     borderRadius: 20,
-    border: "1px solid rgba(255,255,255,0.1)",
-  },
-  questionText: {
-    fontSize: "1.3rem",
-    marginBottom: 20,
-    lineHeight: 1.4,
   },
   option: {
     width: "100%",
@@ -368,82 +348,48 @@ const styles = {
     borderRadius: 12,
     border: "none",
     cursor: "pointer",
-    background: "rgba(255,255,255,0.1)",
-    color: "white",
-    fontSize: "1rem",
-  },
-  correctSelected: {
-    background: "linear-gradient(45deg,#FFD700,#fff0a8)",
-    boxShadow: "0 0 30px gold",
-    transform: "scale(1.04)",
-    color: "black",
-    fontWeight: "bold",
-  },
-  no: {
-    padding: 14,
-    marginTop: 12,
-    borderRadius: 12,
-    border: "none",
-    background: "#ff4d4d",
-    color: "white",
-    cursor: "pointer",
-    minWidth: 100,
-  },
-  beginBtn: {
-    padding: "14px 30px",
-    borderRadius: 50,
-    border: "none",
-    cursor: "pointer",
-    background: "white",
-    color: "black",
-    fontWeight: "bold",
-    fontSize: "1rem",
   },
   center: {
+    minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
-    gap: 20,
+    gap: 24,
+    padding: "40px 20px",
     textAlign: "center",
   },
   image: {
-    maxWidth: "90vw",
-    maxHeight: "50vh",
-    borderRadius: 15,
-    objectFit: "cover",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-  },
-  finalWrapper: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 25,
+    maxWidth: "85vw",
+    maxHeight: "65vh",
+    borderRadius: 20,
   },
   finalText: {
-    fontSize: "clamp(24px, 6vw, 40px)", // Made smaller to fit mobile screens
-    textAlign: "center",
-    lineHeight: 1.3,
+    fontSize: "clamp(26px, 6vw, 42px)",
+    lineHeight: 1.2,
     background: "linear-gradient(45deg,#FFD700,#fff0a8)",
     WebkitBackgroundClip: "text",
     color: "transparent",
     fontWeight: "800",
-    padding: "0 10px",
+  },
+  beginBtn: {
+    padding: "14px 30px",
+    borderRadius: 14,
+    border: "none",
+    cursor: "pointer",
   },
   heart: {
     position: "absolute",
     right: 20,
     top: 20,
-    fontSize: "1.2rem",
+    fontSize: "clamp(20px,3.5vw,28px)",
     fontWeight: "700",
-    zIndex: 10,
   },
   timer: {
     position: "absolute",
     left: 20,
     top: 20,
-    fontSize: "1.2rem",
+    fontSize: "clamp(22px,4vw,32px)",
     fontWeight: "700",
-    zIndex: 10,
   },
 };
