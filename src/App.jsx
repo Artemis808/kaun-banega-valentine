@@ -16,8 +16,7 @@ const questions = [
     image: "/kbv-images/1.jpg",
   },
   {
-    question:
-      "What was technically the first meal you made for me?",
+    question: "What was technically the first meal you made for me?",
     options: [
       "You is a snacc",
       "Bheja fryyy",
@@ -69,8 +68,9 @@ export default function App() {
   const [revealed, setRevealed] = useState(false);
   const [timer, setTimer] = useState(15);
   const [hearts, setHearts] = useState(0);
-  const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
+  const [displayHearts, setDisplayHearts] = useState(0);
   const [selected, setSelected] = useState(null);
+  const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
 
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
@@ -94,6 +94,23 @@ export default function App() {
     questionAudio.current.loop = true;
   }, []);
 
+  // LOVE METER SMOOTH COUNT
+  useEffect(() => {
+    if (displayHearts === hearts) return;
+
+    const interval = setInterval(() => {
+      setDisplayHearts((prev) => {
+        if (prev >= hearts) {
+          clearInterval(interval);
+          return hearts;
+        }
+        return prev + 1;
+      });
+    }, 18);
+
+    return () => clearInterval(interval);
+  }, [hearts]);
+
   // TIMER
   useEffect(() => {
     if (!started || revealed) return;
@@ -114,14 +131,20 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, started, revealed]);
 
-  const startGame = () => {
-    openingAudio.current.volume = 0.5;
-    questionAudio.current.volume = 0.35;
+  const startGame = async () => {
+    try {
+      openingAudio.current.volume = 0.6;
+      await openingAudio.current.play();
 
-    openingAudio.current.play();
-    questionAudio.current.play();
+      setTimeout(() => {
+        questionAudio.current.volume = 0.35;
+        questionAudio.current.play();
+      }, 2500);
 
-    setStarted(true);
+      setStarted(true);
+    } catch {
+      setStarted(true);
+    }
   };
 
   const selectAnswer = (i) => {
@@ -133,6 +156,12 @@ export default function App() {
 
       const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
       setHearts(percent);
+
+      confetti({
+        particleCount: 60,
+        spread: 70,
+        origin: { y: 0.2 },
+      });
 
       if (q.finale) {
         questionAudio.current.pause();
@@ -154,6 +183,18 @@ export default function App() {
     setRunaway({ x: 0, y: 0, scale: 1 });
   };
 
+  const restartGame = () => {
+    finaleAudio.current?.pause();
+    questionAudio.current?.pause();
+
+    setQIndex(0);
+    setHearts(0);
+    setDisplayHearts(0);
+    setSelected(null);
+    setRevealed(false);
+    setStarted(false);
+  };
+
   const moveNo = () => {
     setRunaway({
       x: Math.random() * 250 - 125,
@@ -162,7 +203,7 @@ export default function App() {
     });
   };
 
-  // INTRO SCREEN
+  // INTRO
   if (!started) {
     return (
       <div style={styles.loader}>
@@ -191,9 +232,14 @@ export default function App() {
     <div style={styles.bg}>
       {q.finale && !revealed && <div style={styles.spotlight} />}
 
-      <div style={styles.heart}>
-        ❤️ {hearts}% {hearts === 69 && "(nice)"}
-      </div>
+      {/* LOVE METER */}
+      <motion.div
+        style={styles.heart}
+        animate={{ scale: [1, 1.15, 1] }}
+        transition={{ duration: 1.6, repeat: Infinity }}
+      >
+        ❤️ {displayHearts}% {displayHearts === 69 && "(nice)"}
+      </motion.div>
 
       <div style={styles.timer}>⏳ {timer}</div>
 
@@ -237,7 +283,7 @@ export default function App() {
                     ...styles.option,
                     ...(isSelected &&
                       isCorrect && {
-                        background: "linear-gradient(45deg,#FFD700,#ffed8a)",
+                        background: "linear-gradient(45deg,#FFD700,#fff0a8)",
                         boxShadow: "0 0 30px gold",
                         transform: "scale(1.06)",
                       }),
@@ -262,7 +308,17 @@ export default function App() {
                 Continue ❤️
               </button>
             ) : (
-              <h1>🎉 You just made me the happiest person alive ❤️</h1>
+              <>
+                <h1 style={styles.finalText}>
+                  ❤️ Happy Valentine’s Day  
+                  <br />
+                  To My Forever Valentine ❤️
+                </h1>
+
+                <button style={styles.beginBtn} onClick={restartGame}>
+                  Play Again ❤️
+                </button>
+              </>
             )}
           </motion.div>
         )}
@@ -301,7 +357,6 @@ const styles = {
     background: "rgba(0,0,0,0.65)",
     padding: 30,
     borderRadius: 20,
-    backdropFilter: "blur(14px)",
   },
   option: {
     width: "100%",
@@ -310,7 +365,6 @@ const styles = {
     borderRadius: 12,
     border: "none",
     cursor: "pointer",
-    transition: "0.25s",
   },
   no: {
     padding: 14,
@@ -325,7 +379,6 @@ const styles = {
     borderRadius: 14,
     border: "none",
     cursor: "pointer",
-    fontSize: 16,
   },
   center: {
     minHeight: "100vh",
@@ -334,12 +387,35 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     gap: 24,
+    padding: "40px 20px",
+    textAlign: "center",
   },
   image: {
     maxWidth: "85vw",
     maxHeight: "65vh",
     borderRadius: 20,
   },
-  heart: { position: "absolute", right: 20, top: 20 },
-  timer: { position: "absolute", left: 20, top: 20 },
+  finalText: {
+    fontSize: "clamp(34px, 7vw, 56px)",
+    textAlign: "center",
+    lineHeight: 1.15,
+    background: "linear-gradient(45deg,#FFD700,#fff0a8)",
+    WebkitBackgroundClip: "text",
+    color: "transparent",
+    fontWeight: "800",
+  },
+  heart: {
+    position: "absolute",
+    right: 20,
+    top: 20,
+    fontSize: "clamp(20px,3.5vw,28px)",
+    fontWeight: "700",
+  },
+  timer: {
+    position: "absolute",
+    left: 20,
+    top: 20,
+    fontSize: "clamp(22px,4vw,32px)",
+    fontWeight: "700",
+  },
 };
