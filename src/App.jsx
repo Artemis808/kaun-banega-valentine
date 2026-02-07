@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
+
 // --- CONTENT ---
 const questions = [
   {
@@ -38,6 +39,7 @@ const questions = [
     finale: true,
   },
 ];
+
 // --- ANIMATION VARIANTS ---
 const pulseAnim = {
   animate: { 
@@ -50,10 +52,12 @@ const pulseAnim = {
     ease: "easeInOut" 
   }
 };
+
 const glowVariants = {
   hover: { scale: 1.02, filter: "brightness(1.2) drop-shadow(0 0 12px rgba(255, 215, 0, 0.6))" },
   tap: { scale: 0.98, filter: "brightness(1.5) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8))" }
 };
+
 export default function App() {
   const [stage, setStage] = useState("lock"); 
   const [showStartBtn, setShowStartBtn] = useState(false);
@@ -64,11 +68,13 @@ export default function App() {
   const [displayHearts, setDisplayHearts] = useState(0);
   const [selected, setSelected] = useState(null);
   const [noButtonPos, setNoButtonPos] = useState({ x: 0, y: 0, scale: 1 });
+  
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
   const correctAudio = useRef(null);
   const finaleAudio = useRef(null);
   const popAudio = useRef(null);
+
   useEffect(() => {
     openingAudio.current = new Audio("/music/opening.mp3");
     questionAudio.current = new Audio("/music/question.mp3");
@@ -77,11 +83,13 @@ export default function App() {
     popAudio.current = new Audio("/music/pop.mp3");
     questionAudio.current.loop = true;
   }, []);
+
   const stopAllAudio = () => {
     [openingAudio, questionAudio, correctAudio, finaleAudio].forEach(ref => {
       if (ref.current) { ref.current.pause(); ref.current.currentTime = 0; }
     });
   };
+
   const triggerHaptic = () => {
     if (navigator.vibrate) navigator.vibrate(15);
     if (popAudio.current) {
@@ -90,21 +98,25 @@ export default function App() {
       popAudio.current.play().catch(() => {});
     }
   };
+
   const moveNoButton = () => {
-    const randomX = (Math.random() - 0.5) * 320;
-    const randomY = (Math.random() - 0.5) * 320;
+    const randomX = (Math.random() - 0.5) * 200;
+    const randomY = (Math.random() - 0.5) * 200;
+    
     setNoButtonPos(prev => ({ 
       x: randomX, 
       y: randomY,
-      scale: Math.max(0.3, (prev.scale || 1) - 0.15)
+      scale: Math.max(0.3, (prev.scale || 1) - 0.15) // Shrink progressively but not below 0.3
     }));
   };
+
   const handleUnlock = () => {
     triggerHaptic();
     setStage("intro");
     openingAudio.current?.play();
     setTimeout(() => setShowStartBtn(true), 4000);
   };
+
   const startQuiz = () => {
     triggerHaptic();
     openingAudio.current?.pause();
@@ -112,6 +124,7 @@ export default function App() {
     questionAudio.current?.play();
     setStage("quiz");
   };
+
   const selectAnswer = (i) => {
     triggerHaptic();
     setSelected(i);
@@ -122,6 +135,7 @@ export default function App() {
       const percent = qIndex === 3 ? 69 : Math.round(((qIndex + 1) / 5) * 100);
       setHearts(percent);
       confetti({ particleCount: 60, spread: 70, origin: { y: 0.3 } });
+      
       if (questions[qIndex].finale) {
         questionAudio.current?.pause();
         finaleAudio.current.volume = 0.8;
@@ -130,6 +144,7 @@ export default function App() {
       }
     }, 800);
   };
+
   const fullRestart = () => {
     triggerHaptic();
     stopAllAudio();
@@ -141,6 +156,7 @@ export default function App() {
     setSelected(null);
     setNoButtonPos({ x: 0, y: 0, scale: 1 });
   };
+
   useEffect(() => {
     if (displayHearts === hearts) return;
     const interval = setInterval(() => {
@@ -148,6 +164,7 @@ export default function App() {
     }, 25);
     return () => clearInterval(interval);
   }, [hearts]);
+
   useEffect(() => {
     if (stage !== "quiz" || revealed) return;
     setTimer(15);
@@ -156,6 +173,7 @@ export default function App() {
     }, 1000);
     return () => clearInterval(interval);
   }, [qIndex, stage, revealed]);
+
   if (stage === "lock") {
     return (
       <div style={styles.loader}>
@@ -164,6 +182,7 @@ export default function App() {
       </div>
     );
   }
+
   if (stage === "intro") {
     return (
       <div style={styles.loader}>
@@ -176,67 +195,63 @@ export default function App() {
       </div>
     );
   }
+
   return (
     <div style={styles.bg}>
       <div style={styles.statusBar}>
         <div style={styles.statusItem}>⏳ {timer}s</div>
         <motion.div {...pulseAnim} style={{...styles.statusItem, color: '#ff4d4d'}}>
-           ❤️ {displayHearts}% {displayHearts === 69 && <span style={styles.niceText}>(nice)</span>}
+            ❤️ {displayHearts}% {displayHearts === 69 && <span style={styles.niceText}>(nice)</span>}
         </motion.div>
       </div>
+
       <AnimatePresence mode="wait">
         {!revealed ? (
           <motion.div key={`q-${qIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={styles.card}>
             <h2 style={styles.questionText}>{questions[qIndex].question}</h2>
+            
             {questions[qIndex].options.map((opt, i) => {
-              if (questions[qIndex].finale && i === 3) {
-                return (
-                  <motion.button
-                    key={i}
-                    animate={{
-                      x: noButtonPos.x,
-                      y: noButtonPos.y,
-                      scale: noButtonPos.scale
-                    }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 18
-                    }}
-                    variants={glowVariants}
-                    whileHover="hover"
-                    whileTap="tap"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      moveNoButton();
-                    }}
-                    onMouseEnter={moveNoButton}
-                    onTouchStart={(e) => {
-                      e.preventDefault();
-                      moveNoButton();
-                    }}
-                    style={{
-                      ...styles.option,
-                      background: 'rgba(255, 0, 0, 0.2)',
-                      border: '1px solid rgba(255, 0, 0, 0.4)',
-                      color: '#ff6b6b',
-                      position: 'relative'
-                    }}
-                  >
-                    {opt}
-                  </motion.button>
-                );
-              }
+              // --- FIX: Check if this is the "No" button ---
+              const isNoButton = questions[qIndex].finale && i === 3;
+              
               return (
                 <motion.button
                   key={i}
-                  variants={glowVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  onClick={() => selectAnswer(i)}
+                  // Disable standard hover effects for the No button so they don't fight the movement
+                  variants={isNoButton ? {} : glowVariants}
+                  whileHover={isNoButton ? {} : "hover"}
+                  whileTap={isNoButton ? {} : "tap"}
+                  
+                  // Use 'animate' for the No button position
+                  animate={isNoButton ? { x: noButtonPos.x, y: noButtonPos.y, scale: noButtonPos.scale } : {}}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+
+                  onClick={() => {
+                    if (isNoButton) {
+                      moveNoButton();
+                    } else {
+                      selectAnswer(i);
+                    }
+                  }}
+                  onMouseEnter={() => {
+                    if (isNoButton) moveNoButton();
+                  }}
+                  onTouchStart={(e) => {
+                    if (isNoButton) {
+                      e.preventDefault();
+                      moveNoButton();
+                    }
+                  }}
                   style={{
-                      ...styles.option,
-                      ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {})
+                    ...styles.option,
+                    ...(selected === i && questions[qIndex].correct.includes(i) ? styles.correct : {}),
+                    ...(isNoButton ? {
+                      position: 'relative',
+                      background: 'rgba(255, 0, 0, 0.2)',
+                      border: '1px solid rgba(255, 0, 0, 0.4)',
+                      color: '#ff6b6b',
+                      transition: "none" // IMPORTANT: Prevents CSS from fighting the JS animation
+                    } : {})
                   }}
                 >
                   {opt}
@@ -264,3 +279,72 @@ export default function App() {
     </div>
   );
 }
+
+const styles = {
+  loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20 },
+  subText: { color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' },
+  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1a0033, #000 90%)", color: "white", padding: "80px 15px 30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden" },
+  
+  statusBar: { 
+    position: "fixed", top: 15, width: "85%", maxWidth: 350, 
+    background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", 
+    borderRadius: 40, padding: "8px 20px", display: "flex", 
+    justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.1)", zIndex: 100 
+  },
+  statusItem: { fontWeight: "bold", fontSize: 14, display: 'flex', alignItems: 'center', gap: 4 },
+  niceText: { fontSize: '0.7rem', color: '#FFD700', marginLeft: 2 },
+  card: { width: "100%", maxWidth: 420, background: "rgba(255,255,255,0.04)", borderRadius: 30, padding: 25, border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)" },
+  questionText: { fontSize: "1.2rem", textAlign: "center", marginBottom: 20, lineHeight: 1.4, fontWeight: "500" },
+  
+  option: { 
+    width: "100%", padding: "16px", marginTop: 10, borderRadius: 18, 
+    border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", 
+    color: "white", cursor: "pointer", textAlign: "left", fontSize: "0.95rem",
+    transition: "all 0.2s ease" 
+  },
+  correct: { background: "linear-gradient(90deg, #FFD700, #FFA500)", color: "black", fontWeight: "bold", border: "none" },
+  
+  btn: { 
+    padding: "15px 45px", borderRadius: 50, border: "none", background: "white", 
+    color: "black", fontWeight: "bold", fontSize: 16, cursor: "pointer", 
+    marginTop: 15, boxShadow: "0 8px 20px rgba(0,0,0,0.4)" 
+  },
+  imageContainer: { 
+    display: "flex", 
+    flexDirection: "column", 
+    alignItems: "center", 
+    width: "100%", 
+    maxWidth: "90vw",
+    height: "calc(100vh - 180px)", 
+  },
+  imgFrame: { 
+    width: "100%", 
+    flex: 1, 
+    background: "rgba(255,255,255,0.02)", 
+    borderRadius: 24, 
+    padding: 8, 
+    border: "1px solid rgba(255,255,255,0.1)", 
+    marginBottom: 12, 
+    display: "flex", 
+    justifyContent: "center", 
+    alignItems: "center",
+    overflow: "hidden",
+    minHeight: 0, 
+  },
+  img: { 
+    maxWidth: "100%", 
+    maxHeight: "100%", 
+    width: "auto",
+    height: "auto",
+    borderRadius: 20, 
+    objectFit: "contain", 
+    display: "block" 
+  },
+  
+  finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center' },
+  finalText: { 
+    fontSize: "clamp(1.4rem, 6vw, 2.2rem)", background: "linear-gradient(to bottom, #FFD700, #fff0a8)", 
+    WebkitBackgroundClip: "text", color: "transparent", fontWeight: "900", 
+    lineHeight: 1.2, margin: "10px 0", textAlign: "center" 
+  }
+};
