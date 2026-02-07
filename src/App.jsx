@@ -19,8 +19,8 @@ const questions = [
   {
     question: "If not for your current job, which job would you be perfect for?",
     options: [
-      "Fasshun model", "Interior designer", "Personal chef 😛",
-      "Artist", "Rider", "Dancer", "All of the above!"
+      "Fasshun model and trend setter", "Interior designer", "Personal chef 😛",
+      "Artist", "I'm a riderrr", "Dancer", "All of the above!"
     ],
     correct: [6],
     image: "/kbv-images/3.jpg",
@@ -67,7 +67,6 @@ export default function App() {
   const [hearts, setHearts] = useState(0);
   const [displayHearts, setDisplayHearts] = useState(0);
   const [selected, setSelected] = useState(null);
-  const [runaway, setRunaway] = useState({ x: 0, y: 0, scale: 1 });
 
   const openingAudio = useRef(null);
   const questionAudio = useRef(null);
@@ -163,8 +162,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [qIndex, stage, revealed]);
 
-  // --- RENDER HELPERS ---
-
   if (stage === "lock") {
     return (
       <div style={styles.loader}>
@@ -189,7 +186,6 @@ export default function App() {
 
   return (
     <div style={styles.bg}>
-      {/* SLIM FLOATING STATUS BAR */}
       <div style={styles.statusBar}>
         <div style={styles.statusItem}>⏳ {timer}s</div>
         <motion.div {...pulseAnim} style={{...styles.statusItem, color: '#ff4d4d'}}>
@@ -219,9 +215,11 @@ export default function App() {
           </motion.div>
         ) : (
           <motion.div key={`img-${qIndex}`} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} style={styles.imageContainer}>
-            <div style={{...styles.imgFrame, maxHeight: qIndex === questions.length - 1 ? "45vh" : "68vh"}}>
+            {/* NO CROP IMAGE FRAME */}
+            <div style={{...styles.imgFrame, maxHeight: qIndex === questions.length - 1 ? "40vh" : "60vh"}}>
                 <img src={questions[qIndex].image} style={styles.img} alt="Memory" />
             </div>
+            
             {qIndex < questions.length - 1 ? (
               <motion.button variants={glowVariants} whileHover="hover" whileTap="tap" onClick={() => {triggerHaptic(); setRevealed(false); setQIndex(p=>p+1); setSelected(null);}} style={styles.btn}>Next ❤️</motion.button>
             ) : (
@@ -237,13 +235,11 @@ export default function App() {
   );
 }
 
-// --- UPDATED STYLES ---
 const styles = {
   loader: { height: "100vh", background: "black", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 20 },
   subText: { color: "rgba(255,255,255,0.5)", fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' },
-  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1a0033, #000 90%)", color: "white", padding: "70px 15px 30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden" },
+  bg: { minHeight: "100vh", background: "radial-gradient(circle at top, #1a0033, #000 90%)", color: "white", padding: "80px 15px 30px", display: "flex", flexDirection: "column", alignItems: "center", overflow: "hidden" },
   
-  // Floating Slim Status Bar
   statusBar: { 
     position: "fixed", top: 15, width: "85%", maxWidth: 350, 
     background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)", 
@@ -270,14 +266,26 @@ const styles = {
     marginTop: 15, boxShadow: "0 8px 20px rgba(0,0,0,0.4)" 
   },
 
-  // Image Layout
-  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 480 },
+  imageContainer: { display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: "90vw" },
   imgFrame: { 
-    width: "100%", background: "rgba(255,255,255,0.05)", borderRadius: 30, 
-    padding: 6, border: "1px solid rgba(255,255,255,0.1)", marginBottom: 12, 
-    display: "flex", justifyContent: "center", overflow: "hidden" 
+    width: "100%", 
+    background: "rgba(255,255,255,0.02)", 
+    borderRadius: 24, 
+    padding: 4, 
+    border: "1px solid rgba(255,255,255,0.1)", 
+    marginBottom: 12, 
+    display: "flex", 
+    justifyContent: "center", 
+    alignItems: "center",
+    overflow: "hidden" 
   },
-  img: { width: "100%", height: "100%", borderRadius: 24, objectFit: "cover", display: "block" },
+  img: { 
+    maxWidth: "100%", 
+    maxHeight: "100%", 
+    borderRadius: 20, 
+    objectFit: "contain", // CHANGED: This prevents cropping
+    display: "block" 
+  },
   
   finalCenter: { textAlign: "center", display: "flex", flexDirection: "column", alignItems: 'center' },
   finalText: { 
